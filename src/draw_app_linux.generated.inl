@@ -1,6 +1,6 @@
 // AUTO-GENERATED. DO NOT EDIT BY HAND.
 // Source of truth: src/main.cpp :: DrawApp()
-// Windows DrawApp SHA-256: 3fee1a41b47bcaadfd79ffc8937b411882b236cdd5a44abf4cef73a702c33925
+// Windows DrawApp SHA-256: 2c1b2ea1ddff64b37b966b95e75b1bbda21af3c582a222b200d8130ae2e8fab0
 // Linux platform substitutions: optical roots=2, BurnerMAX roots=1, D3D texture handle -> OpenGL ID.
 
 void DrawApp(
@@ -452,12 +452,14 @@ void DrawApp(
         ImGui::Spacing();
         ImGui::TextDisabled("WRITE SPEED");
 
-        // RB_STAGE44A_SHARED_MEDIA_SPEED_GATE
+        // RB_STAGE44C_RECOMMENDED_SPEED_DEFAULTS
         //
-        // The mounted MMC media profile is authoritative. Console selection
-        // decides which media family is acceptable; it must never decide how
-        // a foreign media descriptor is formatted. In particular, a DVD-R
-        // descriptor such as 22160 KB/s must never reach a CD console's list.
+        // One shared Windows/Linux UI policy:
+        //   * actual mounted MMC profile gates the list and selects x-units;
+        //   * console-specific conservative speed becomes the initial default;
+        //   * user can still explicitly choose another speed or Automatic;
+        //   * the recommendation is re-applied only when drive/media/profile
+        //     context changes, never every frame.
         const bool blankWritableMedia =
             drive != nullptr &&
             drive->mediaPresent &&
@@ -479,6 +481,12 @@ void DrawApp(
              mountedProfile == 0x0015 ||
              mountedProfile == 0x0016 ||
              mountedProfile == 0x001B ||
+             mountedProfile == 0x002B);
+
+        const bool mountedDvdDualLayer =
+            blankWritableMedia &&
+            (mountedProfile == 0x0015 ||
+             mountedProfile == 0x0016 ||
              mountedProfile == 0x002B);
 
         const bool mountedDvdPlusRDl =
@@ -506,10 +514,177 @@ void DrawApp(
                     ? "Insert blank DVD-R / DVD+R / DVD-DL"
                     : "Insert blank CD-R");
 
-        // A selection made for a previous media/profile must not survive after
-        // the user inserts incompatible media or changes console profile.
+        const auto chooseRecommendedSpeed =
+            [&]() -> int {
+                if (!speedMediaCompatible ||
+                    drive == nullptr ||
+                    drive->writeSpeeds.empty()) {
+                    return 0;
+                }
+
+                int lowestIndex = 0;
+                std::uint32_t lowestKbps =
+                    drive->writeSpeeds[0].kilobytesPerSecond;
+
+                for (int index = 1;
+                     index <
+                         static_cast<int>(
+                             drive->writeSpeeds.size());
+                     ++index) {
+                    const std::uint32_t kbps =
+                        drive->writeSpeeds[
+                            static_cast<std::size_t>(
+                                index)]
+                            .kilobytesPerSecond;
+
+                    if (kbps < lowestKbps) {
+                        lowestKbps = kbps;
+                        lowestIndex = index;
+                    }
+                }
+
+                // CD-based consoles intentionally prefer the lowest actual
+                // speed the inserted CD-R reports.
+                if (!dvdSpeedMode) {
+                    return lowestIndex + 1;
+                }
+
+                int preferredX = 0;
+
+                if (state.selectedConsole ==
+                        ConsoleProfile::Xbox360 ||
+                    mountedDvdDualLayer) {
+                    preferredX = 4;
+                } else if (
+                    state.selectedConsole ==
+                        ConsoleProfile::PlayStation2Dvd) {
+                    preferredX = 6;
+                }
+
+                if (preferredX <= 0) {
+                    return lowestIndex + 1;
+                }
+
+                const std::uint32_t targetKbps =
+                    static_cast<std::uint32_t>(
+                        preferredX * 1385);
+
+                int preferredIndex = -1;
+                std::uint32_t preferredDistance =
+                    0xFFFFFFFFU;
+
+                for (int index = 0;
+                     index <
+                         static_cast<int>(
+                             drive->writeSpeeds.size());
+                     ++index) {
+                    const std::uint32_t kbps =
+                        drive->writeSpeeds[
+                            static_cast<std::size_t>(
+                                index)]
+                            .kilobytesPerSecond;
+
+                    const long roundedX =
+                        std::lround(
+                            static_cast<float>(kbps) /
+                            1385.0F);
+
+                    if (roundedX != preferredX) {
+                        continue;
+                    }
+
+                    const std::uint32_t distance =
+                        kbps >= targetKbps
+                            ? kbps - targetKbps
+                            : targetKbps - kbps;
+
+                    if (preferredIndex < 0 ||
+                        distance < preferredDistance) {
+                        preferredIndex = index;
+                        preferredDistance = distance;
+                    }
+                }
+
+                return preferredIndex >= 0
+                    ? preferredIndex + 1
+                    : lowestIndex + 1;
+            };
+
+        const int recommendedSpeedIndex =
+            chooseRecommendedSpeed();
+
+        // Fingerprint the speed/media context so recommendation is applied
+        // once when the drive/media/profile changes. This preserves a user's
+        // later explicit choice, including Automatic (drive/media).
+        std::uint64_t speedContextFingerprint =
+            static_cast<std::uint64_t>(
+                mountedProfile) +
+            0x9E3779B97F4A7C15ULL;
+
+        if (drive != nullptr) {
+            speedContextFingerprint ^=
+                static_cast<std::uint64_t>(
+                    drive->mediaPresent ? 1U : 0U)
+                << 48U;
+            speedContextFingerprint ^=
+                static_cast<std::uint64_t>(
+                    drive->blankMedia ? 1U : 0U)
+                << 49U;
+
+            for (const WriteSpeed& speed :
+                 drive->writeSpeeds) {
+                speedContextFingerprint ^=
+                    static_cast<std::uint64_t>(
+                        speed.kilobytesPerSecond) +
+                    0x9E3779B97F4A7C15ULL +
+                    (speedContextFingerprint << 6U) +
+                    (speedContextFingerprint >> 2U);
+            }
+        }
+
+        const std::wstring currentSpeedDrive =
+            drive == nullptr
+                ? std::wstring{}
+                : (!drive->rootPath.empty()
+                    ? drive->rootPath
+                    : drive->devicePath);
+
+        static bool speedDefaultContextKnown = false;
+        static std::wstring speedDefaultDrive;
+        static std::uint16_t speedDefaultProfile = 0xFFFFU;
+        static ConsoleProfile speedDefaultConsole =
+            ConsoleProfile::Count;
+        static std::uint64_t speedDefaultFingerprint = 0;
+
+        const bool speedContextChanged =
+            !speedDefaultContextKnown ||
+            speedDefaultDrive != currentSpeedDrive ||
+            speedDefaultProfile != mountedProfile ||
+            speedDefaultConsole != state.selectedConsole ||
+            speedDefaultFingerprint != speedContextFingerprint;
+
+        if (speedContextChanged) {
+            speedDefaultContextKnown = true;
+            speedDefaultDrive = currentSpeedDrive;
+            speedDefaultProfile = mountedProfile;
+            speedDefaultConsole = state.selectedConsole;
+            speedDefaultFingerprint =
+                speedContextFingerprint;
+
+            state.selectedSpeed =
+                speedMediaCompatible
+                    ? recommendedSpeedIndex
+                    : 0;
+        }
+
         if (!speedMediaCompatible) {
             state.selectedSpeed = 0;
+        } else if (
+            state.selectedSpeed >
+            static_cast<int>(
+                drive->writeSpeeds.size())) {
+            state.selectedSpeed =
+                recommendedSpeedIndex;
         }
 
         std::string speedPreview =
@@ -531,6 +706,12 @@ void DrawApp(
                         static_cast<std::size_t>(
                             state.selectedSpeed - 1)],
                     dvdSpeedMode);
+
+            if (state.selectedSpeed ==
+                recommendedSpeedIndex) {
+                speedPreview +=
+                    " - Recommended";
+            }
         }
 
         ImGui::BeginDisabled(
@@ -554,12 +735,18 @@ void DrawApp(
                          static_cast<int>(
                              drive->writeSpeeds.size());
                      ++index) {
-                    const std::string label =
+                    std::string label =
                         FormatSpeed(
                             drive->writeSpeeds[
                                 static_cast<std::size_t>(
                                     index)],
                             dvdSpeedMode);
+
+                    if (index + 1 ==
+                        recommendedSpeedIndex) {
+                        label +=
+                            " - Recommended";
+                    }
 
                     const bool selected =
                         state.selectedSpeed ==
@@ -590,6 +777,23 @@ void DrawApp(
             ImGui::TextDisabled(
                 "%s",
                 speedMediaPrompt);
+        } else if (
+            recommendedSpeedIndex > 0) {
+            if (state.selectedConsole ==
+                    ConsoleProfile::PlayStation2Dvd &&
+                !mountedDvdDualLayer) {
+                ImGui::TextDisabled(
+                    "Console-safe default: prefer 6x when the current media advertises it.");
+            } else if (
+                state.selectedConsole ==
+                    ConsoleProfile::Xbox360 ||
+                mountedDvdDualLayer) {
+                ImGui::TextDisabled(
+                    "Console-safe default: prefer 4x when the current dual-layer media advertises it.");
+            } else {
+                ImGui::TextDisabled(
+                    "Console-safe default: lowest speed advertised by the current CD-R.");
+            }
         } else {
             ImGui::TextDisabled(
                 "%s",

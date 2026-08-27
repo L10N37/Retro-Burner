@@ -170,6 +170,7 @@ required_windows_strings = [
     "growisofs (DVD profiles only)",
     "WRITE SPEED",
     "Automatic (drive/media)",
+    " - Recommended",
     "Insert blank CD-R",
     "Insert blank DVD-R / DVD+R / DVD-DL",
     "Insert blank DVD+R DL",

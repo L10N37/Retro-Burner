@@ -1,6 +1,6 @@
 // AUTO-GENERATED. DO NOT EDIT BY HAND.
 // Source of truth: src/main.cpp :: DrawApp()
-// Windows DrawApp SHA-256: 3f8182a5fe236b916f2d66c952b2f0d6c197f3de07cf460f35a60494fcf21bbc
+// Windows DrawApp SHA-256: 3fee1a41b47bcaadfd79ffc8937b411882b236cdd5a44abf4cef73a702c33925
 // Linux platform substitutions: optical roots=2, BurnerMAX roots=1, D3D texture handle -> OpenGL ID.
 
 void DrawApp(
@@ -451,12 +451,76 @@ void DrawApp(
 
         ImGui::Spacing();
         ImGui::TextDisabled("WRITE SPEED");
+
+        // RB_STAGE44A_SHARED_MEDIA_SPEED_GATE
+        //
+        // The mounted MMC media profile is authoritative. Console selection
+        // decides which media family is acceptable; it must never decide how
+        // a foreign media descriptor is formatted. In particular, a DVD-R
+        // descriptor such as 22160 KB/s must never reach a CD console's list.
+        const bool blankWritableMedia =
+            drive != nullptr &&
+            drive->mediaPresent &&
+            drive->blankMediaKnown &&
+            drive->blankMedia;
+
+        const std::uint16_t mountedProfile =
+            drive != nullptr
+                ? drive->currentProfile
+                : 0;
+
+        const bool mountedCdR =
+            blankWritableMedia &&
+            mountedProfile == 0x0009;
+
+        const bool mountedDvdRecordable =
+            blankWritableMedia &&
+            (mountedProfile == 0x0011 ||
+             mountedProfile == 0x0015 ||
+             mountedProfile == 0x0016 ||
+             mountedProfile == 0x001B ||
+             mountedProfile == 0x002B);
+
+        const bool mountedDvdPlusRDl =
+            blankWritableMedia &&
+            mountedProfile == 0x002B;
+
+        const bool speedMediaCompatible =
+            state.selectedConsole == ConsoleProfile::PlayStation2Dvd
+                ? mountedDvdRecordable
+                : (state.selectedConsole == ConsoleProfile::Xbox360
+                    ? mountedDvdPlusRDl
+                    : mountedCdR);
+
         const bool dvdSpeedMode =
-            IsDvdProfile(state.selectedConsole);
+            mountedProfile == 0x0011 ||
+            mountedProfile == 0x0015 ||
+            mountedProfile == 0x0016 ||
+            mountedProfile == 0x001B ||
+            mountedProfile == 0x002B;
 
-        std::string speedPreview = "Automatic (recommended)";
+        const char* speedMediaPrompt =
+            state.selectedConsole == ConsoleProfile::Xbox360
+                ? "Insert blank DVD+R DL"
+                : (state.selectedConsole == ConsoleProfile::PlayStation2Dvd
+                    ? "Insert blank DVD-R / DVD+R / DVD-DL"
+                    : "Insert blank CD-R");
 
-        if (drive != nullptr &&
+        // A selection made for a previous media/profile must not survive after
+        // the user inserts incompatible media or changes console profile.
+        if (!speedMediaCompatible) {
+            state.selectedSpeed = 0;
+        }
+
+        std::string speedPreview =
+            drive == nullptr
+                ? "Select optical writer"
+                : (speedMediaCompatible
+                    ? "Automatic (drive/media)"
+                    : speedMediaPrompt);
+
+        if (speedMediaCompatible &&
+            drive != nullptr &&
             state.selectedSpeed > 0 &&
             state.selectedSpeed <=
                 static_cast<int>(
@@ -470,7 +534,8 @@ void DrawApp(
         }
 
         ImGui::BeginDisabled(
-            burn.busy);
+            burn.busy ||
+            !speedMediaCompatible);
 
         ImGui::SetNextItemWidth(-1.0F);
 
@@ -478,7 +543,7 @@ void DrawApp(
                 "##WriteSpeed",
                 speedPreview.c_str())) {
             if (ImGui::Selectable(
-                    "Automatic",
+                    "Automatic (drive/media)",
                     state.selectedSpeed == 0)) {
                 state.selectedSpeed = 0;
             }
@@ -506,6 +571,10 @@ void DrawApp(
                         state.selectedSpeed =
                             index + 1;
                     }
+
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
                 }
             }
 
@@ -514,13 +583,17 @@ void DrawApp(
 
         ImGui::EndDisabled();
 
-        if (drive != nullptr) {
+        if (drive == nullptr) {
+            ImGui::TextDisabled(
+                "Connect a USB or internal CD/DVD writer, then press Refresh.");
+        } else if (!speedMediaCompatible) {
+            ImGui::TextDisabled(
+                "%s",
+                speedMediaPrompt);
+        } else {
             ImGui::TextDisabled(
                 "%s",
                 drive->speedQueryMessage.c_str());
-        } else {
-            ImGui::TextDisabled(
-                "Connect a USB or internal CD/DVD writer, then press Refresh.");
         }
 
         ImGui::Spacing();

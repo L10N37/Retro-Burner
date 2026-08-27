@@ -7,8 +7,12 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Root = [IO.Path]::GetFullPath($Root)
+# RB_STAGE44R_INTERNAL_SCRIPT_REPO_ROOT
+# This script lives in scripts\internal, so the repository root is two
+# directories above $PSScriptRoot.
+$Root = [IO.Path]::GetFullPath(
+    (Join-Path $PSScriptRoot "..\..")
+)
 
 $SourceDir = Join-Path $Root "cmake\retroburner-optical"
 $BuildDir  = Join-Path $Root "build\retrobeam-optical-mingw32"

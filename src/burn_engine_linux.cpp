@@ -1,4 +1,6 @@
 #include "burn_engine.h"
+#include "retrobeam_failure.h"
+#include "ps2_media_probe.h"
 #include "retrobeam_progress.h"
 #include "embedded_bundle_linux.h"
 #include "burnermax.h"
@@ -3771,6 +3773,27 @@ void BurnEngine::RunStandardImage(
                     "The PS2 CD ISO is empty or is not aligned to 2048-byte sectors.");
                 return;
             }
+
+            // RB_STAGE44K_PS2CD_VALIDATION_GATE
+            const Ps2IsoMediaProbeResult mediaProbe =
+                ProbePs2IsoMedia(
+                    imagePath);
+
+            if (!mediaProbe.inspected) {
+                SetFailure(
+                    "Could not inspect the PS2 ISO media type: " +
+                    mediaProbe.error);
+                return;
+            }
+
+            if (mediaProbe.LooksLikeDvdOrigin()) {
+                SetFailure(
+                    "This ISO contains DVD/UDF filesystem structures (" +
+                    mediaProbe.evidence +
+                    "). It may fit on a CD-R by size, but it is not a PS2 CD image. "
+                    "Select PlayStation 2 - DVD instead.");
+                return;
+            }
         } else {
             SetFailure(
                 "PlayStation 2 CD supports .cue (BIN/CUE) or .iso images.");
@@ -3788,7 +3811,7 @@ void BurnEngine::RunStandardImage(
                 (cueTracks == 1
                     ? " track"
                     : " tracks")
-            : "PlayStation 2 CD ISO")
+            : "PlayStation 2 CD ISO - no UDF/DVD markers detected")
         : std::string(
             Stage36TargetName(
                 request.target)) +
@@ -3913,16 +3936,46 @@ void BurnEngine::RunStandardImage(
     if (request.simulate)
         args.emplace_back("-dummy");
 
-    args.emplace_back("-dao");
+    // RB_STAGE44L_PS2CD_TAO_XA
+    //
+    // Preserve XA Mode 2 Form 1 while avoiding DAO SEND CUE SHEET for
+    // single-track PS2-CD ISO images. CUE/BIN layouts continue to use DAO.
+    const bool ps2CdIso =
+        request.target ==
+            BurnTarget::PlayStation2Cd &&
+        extension == ".iso";
+
+    args.emplace_back(
+        ps2CdIso
+            ? "-tao"
+            : "-dao");
 
     if (extension == ".cue") {
         args.emplace_back(
             "cuefile=" +
             imagePath.string());
+    } else if (
+        request.target ==
+            BurnTarget::PlayStation2Cd &&
+        extension == ".iso") {
+        // RB_STAGE44K_PS2CD_XA_MODE
+        args.emplace_back("-xa");
+        args.emplace_back(
+            imagePath.string());
     } else {
         args.emplace_back("-data");
         args.emplace_back(
             imagePath.string());
+    }
+
+    if (ps2CdIso) {
+        AppendLog(
+            "\nPS2 CD ISO recording mode: "
+            "TAO / CD-ROM XA Mode 2 Form 1\n");
+        AppendLog(
+            std::string("Post-burn verification: ") +
+            (request.verifyAfterBurn ? "ON" : "OFF") +
+            "\n");
     }
 
     std::string progressWindow;
@@ -4004,15 +4057,36 @@ void BurnEngine::RunStandardImage(
                         update.speed;
             });
 
-    if (!result.started ||
-        result.exitCode != 0) {
+    // RB_STAGE44L_FAILURE_STATUS
+    if (!result.started) {
+        SetFailure(
+            result.error.empty()
+                ? "RetroBeam could not start."
+                : "RetroBeam could not start: " +
+                      result.error);
+        return;
+    }
+
+    if (result.exitCode != 0) {
+        const std::string detail =
+            SummarizeRetroBeamFailure(
+                result.output.empty()
+                    ? progressWindow
+                    : result.output);
+
         SetFailure(
             request.simulate
-                ? "RetroBeam dummy CD write failed."
-                : std::string(
-                    Stage36TargetName(
-                        request.target)) +
-                    " write failed. The disc may be incomplete.");
+                ? (detail.empty()
+                    ? "RetroBeam dummy CD write failed."
+                    : "RetroBeam dummy CD write failed: " +
+                          detail)
+                : (detail.empty()
+                    ? std::string(
+                          Stage36TargetName(
+                              request.target)) +
+                          " RetroBeam write failed. See Burn Log for full backend output."
+                    : "RetroBeam burn failed: " +
+                          detail));
         return;
     }
 
@@ -4032,17 +4106,29 @@ void BurnEngine::RunStandardImage(
 
     // Preserve the hardware-proven direct SG verification for single-track
     // PS2-CD ISO burns.
-    if (request.target ==
+    // RB_STAGE44M_LINUX_VERIFY_GATE
+    if (request.verifyAfterBurn &&
+        request.target ==
             BurnTarget::PlayStation2Cd &&
         extension == ".iso") {
         {
             std::lock_guard lock(
                 mutex_);
 
+            // RB_STAGE44J_PS2CD_VERIFY_PROGRESS
+            //
+            // The write/fixation has completed, but the job is not done:
+            // direct SG_IO readback may take several minutes. Keep the burn
+            // lifecycle alive and remove stale write-only telemetry.
             state_.writing = false;
             state_.progress = 0.999F;
+            state_.bufferPercent = -1;
+            state_.ringBufferPercent = -1;
+            state_.driveBufferPercent = -1;
+            state_.actualSpeed.clear();
+            state_.remainingTime.clear();
             state_.status =
-                "Write complete; verifying physical sectors via SG_IO...";
+                "Verifying Disc... 0%";
         }
 
         std::this_thread::sleep_for(
@@ -4053,7 +4139,34 @@ void BurnEngine::RunStandardImage(
             VerifyOpticalSectors(
                 request.cdrecordDevice,
                 imagePath,
-                0);
+                0,
+                [this](
+                    const std::uint32_t completedSectors,
+                    const std::uint32_t totalSectors) {
+                    if (totalSectors == 0)
+                        return;
+
+                    const unsigned percent =
+                        static_cast<unsigned>(
+                            std::min<std::uint64_t>(
+                                100ULL,
+                                (static_cast<std::uint64_t>(
+                                     completedSectors) *
+                                 100ULL) /
+                                    totalSectors));
+
+                    std::lock_guard lock(
+                        mutex_);
+
+                    // Main burn progress intentionally remains at 99.9%
+                    // until readback succeeds; verification percent is
+                    // reported explicitly in the live PHASE text.
+                    state_.progress = 0.999F;
+                    state_.status =
+                        "Verifying Disc... " +
+                        std::to_string(percent) +
+                        "%";
+                });
 
         AppendLog(
             "\n===== Direct SG verification =====\n" +

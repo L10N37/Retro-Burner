@@ -123,7 +123,8 @@ std::string OpticalVerifyResult::ToText() const
 OpticalVerifyResult VerifyOpticalSectors(
     const std::string& exactSgDevice,
     const fs::path& sourcePath,
-    const std::uint32_t startLba)
+    const std::uint32_t startLba,
+    OpticalVerifyProgressCallback progressCallback)
 {
     OpticalVerifyResult result;
     result.device = exactSgDevice;
@@ -156,6 +157,9 @@ OpticalVerifyResult VerifyOpticalSectors(
 
     result.sectorCount = static_cast<std::uint32_t>(sectorCountWide);
 
+    if (progressCallback)
+        progressCallback(0, result.sectorCount);
+
     if (startLba >
         std::numeric_limits<std::uint32_t>::max() - result.sectorCount) {
         result.error = "Requested LBA range overflows READ(10).";
@@ -183,6 +187,15 @@ OpticalVerifyResult VerifyOpticalSectors(
     std::vector<unsigned char> mediaBuffer(sourceBuffer.size());
 
     std::uint32_t completed = 0;
+
+    // About 200 UI updates for a whole disc (~0.5% granularity), rather than
+    // one callback per 32-sector SG_IO READ(10).
+    const std::uint32_t progressStep =
+        std::max<std::uint32_t>(
+            1U,
+            result.sectorCount / 200U);
+    std::uint32_t nextProgressReport =
+        progressStep;
 
     while (completed < result.sectorCount) {
         const std::uint16_t sectorsThisCommand =
@@ -301,6 +314,25 @@ OpticalVerifyResult VerifyOpticalSectors(
 
         result.bytesCompared += bytesThisCommand;
         completed += sectorsThisCommand;
+
+        if (progressCallback &&
+            (completed >= nextProgressReport ||
+             completed == result.sectorCount)) {
+            progressCallback(
+                completed,
+                result.sectorCount);
+
+            if (completed <=
+                std::numeric_limits<std::uint32_t>::max() -
+                    progressStep) {
+                nextProgressReport =
+                    completed +
+                    progressStep;
+            } else {
+                nextProgressReport =
+                    result.sectorCount;
+            }
+        }
     }
 
     result.success = true;

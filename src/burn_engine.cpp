@@ -1,4 +1,6 @@
 #include "burn_engine.h"
+#include "retrobeam_failure.h"
+#include "ps2_media_probe.h"
 #include "burnermax.h"
 #include "embedded_tools.h"
 #include "resource.h"
@@ -784,8 +786,29 @@ DWORD CALLBACK CopyProgressRoutine(
             return false;
         }
 
+        // RB_STAGE44K_PS2CD_VALIDATION_GATE
+        const Ps2IsoMediaProbeResult mediaProbe =
+            ProbePs2IsoMedia(imagePath);
+
+        if (!mediaProbe.inspected) {
+            errorMessage =
+                "Could not inspect the PS2 ISO media type: " +
+                mediaProbe.error;
+            return false;
+        }
+
+        if (mediaProbe.LooksLikeDvdOrigin()) {
+            errorMessage =
+                "This ISO contains DVD/UDF filesystem structures (" +
+                mediaProbe.evidence +
+                "). It may fit on a CD-R by size, but it is not a PS2 CD image. "
+                "Select PlayStation 2 - DVD instead.";
+            return false;
+        }
+
         cueTrackCount = 1;
-        layout = "PlayStation 2 CD ISO";
+        layout =
+            "PlayStation 2 CD ISO - no UDF/DVD markers detected";
         return true;
     }
 
@@ -884,6 +907,225 @@ DWORD CALLBACK CopyProgressRoutine(
         return 1024.0 * 1024.0 * 1024.0;
     }
     return 1.0;
+}
+
+// RB_STAGE44M_WINDOWS_OPTICAL_VERIFY
+struct WindowsOpticalVerifyResult final {
+    bool success = false;
+    std::uint32_t sectorCount = 0;
+    std::uint64_t bytesCompared = 0;
+    std::string error;
+};
+
+using WindowsOpticalVerifyProgress =
+    std::function<void(
+        std::uint32_t completedSectors,
+        std::uint32_t totalSectors)>;
+
+[[nodiscard]] WindowsOpticalVerifyResult
+VerifyWindowsOpticalSectors(
+    const std::wstring& opticalDriveRoot,
+    const fs::path& sourcePath,
+    WindowsOpticalVerifyProgress progressCallback)
+{
+    constexpr std::uint64_t kSectorBytes = 2048ULL;
+    constexpr std::uint32_t kChunkSectors = 32U;
+
+    WindowsOpticalVerifyResult result;
+
+    std::error_code sizeError;
+    const std::uintmax_t sourceBytes =
+        fs::file_size(
+            sourcePath,
+            sizeError);
+
+    if (sizeError ||
+        sourceBytes == 0 ||
+        (sourceBytes % kSectorBytes) != 0ULL) {
+        result.error =
+            "Source ISO is empty or not aligned to 2048-byte sectors.";
+        return result;
+    }
+
+    const std::uint64_t totalSectors64 =
+        sourceBytes /
+        kSectorBytes;
+
+    if (totalSectors64 > 0xFFFFFFFFULL) {
+        result.error =
+            "Source ISO has too many sectors for this verifier.";
+        return result;
+    }
+
+    result.sectorCount =
+        static_cast<std::uint32_t>(
+            totalSectors64);
+
+    if (opticalDriveRoot.size() < 2 ||
+        opticalDriveRoot[1] != L':') {
+        result.error =
+            "Windows optical verification requires a drive-letter device.";
+        return result;
+    }
+
+    const std::wstring rawDevice =
+        L"\\\\.\\" +
+        opticalDriveRoot.substr(0, 2);
+
+    UniqueHandle device(
+        CreateFileW(
+            rawDevice.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ |
+                FILE_SHARE_WRITE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr));
+
+    if (!device.Valid()) {
+        result.error =
+            "Could not open the burned disc for readback: " +
+            Win32Error(GetLastError());
+        return result;
+    }
+
+    LARGE_INTEGER beginning{};
+    if (!SetFilePointerEx(
+            device.value,
+            beginning,
+            nullptr,
+            FILE_BEGIN)) {
+        result.error =
+            "Could not seek the optical device to LBA 0: " +
+            Win32Error(GetLastError());
+        return result;
+    }
+
+    std::ifstream source(
+        sourcePath,
+        std::ios::binary);
+
+    if (!source) {
+        result.error =
+            "Could not reopen the source ISO for verification.";
+        return result;
+    }
+
+    std::vector<unsigned char> sourceBuffer(
+        static_cast<std::size_t>(
+            kChunkSectors *
+            kSectorBytes));
+
+    std::vector<unsigned char> discBuffer(
+        sourceBuffer.size());
+
+    if (progressCallback)
+        progressCallback(0, result.sectorCount);
+
+    std::uint32_t completedSectors = 0;
+
+    while (completedSectors < result.sectorCount) {
+        const std::uint32_t sectorsThisChunk =
+            std::min<std::uint32_t>(
+                kChunkSectors,
+                result.sectorCount -
+                    completedSectors);
+
+        const DWORD bytesThisChunk =
+            static_cast<DWORD>(
+                sectorsThisChunk *
+                kSectorBytes);
+
+        source.read(
+            reinterpret_cast<char*>(
+                sourceBuffer.data()),
+            static_cast<std::streamsize>(
+                bytesThisChunk));
+
+        if (source.gcount() !=
+            static_cast<std::streamsize>(
+                bytesThisChunk)) {
+            result.error =
+                "Source ISO became unreadable during verification.";
+            return result;
+        }
+
+        DWORD discBytesRead = 0;
+
+        while (discBytesRead < bytesThisChunk) {
+            DWORD readNow = 0;
+
+            if (!ReadFile(
+                    device.value,
+                    discBuffer.data() +
+                        discBytesRead,
+                    bytesThisChunk -
+                        discBytesRead,
+                    &readNow,
+                    nullptr)) {
+                result.error =
+                    "Optical readback failed at LBA " +
+                    std::to_string(
+                        completedSectors +
+                        (discBytesRead /
+                         static_cast<DWORD>(
+                             kSectorBytes))) +
+                    ": " +
+                    Win32Error(GetLastError());
+                return result;
+            }
+
+            if (readNow == 0) {
+                result.error =
+                    "Optical readback returned end-of-device before "
+                    "the source ISO was fully compared.";
+                return result;
+            }
+
+            discBytesRead += readNow;
+        }
+
+        if (!std::equal(
+                sourceBuffer.begin(),
+                sourceBuffer.begin() +
+                    bytesThisChunk,
+                discBuffer.begin())) {
+            std::size_t mismatch = 0;
+
+            while (mismatch < bytesThisChunk &&
+                   sourceBuffer[mismatch] ==
+                       discBuffer[mismatch]) {
+                ++mismatch;
+            }
+
+            const std::uint64_t mismatchByte =
+                result.bytesCompared +
+                mismatch;
+
+            result.error =
+                "Disc readback mismatch at byte " +
+                std::to_string(mismatchByte) +
+                " (LBA " +
+                std::to_string(
+                    mismatchByte /
+                    kSectorBytes) +
+                ").";
+            return result;
+        }
+
+        completedSectors += sectorsThisChunk;
+        result.bytesCompared += bytesThisChunk;
+
+        if (progressCallback) {
+            progressCallback(
+                completedSectors,
+                result.sectorCount);
+        }
+    }
+
+    result.success = true;
+    return result;
 }
 
 [[nodiscard]] bool EjectOpticalDrive(const std::wstring& rootPath) {
@@ -2921,18 +3163,54 @@ void BurnEngine::RunStandardImage(
     arguments.push_back(JoinRetroBeamDriverOptions(request));
     AppendLog(RetroBeamAdvancedPolicyText(request));
 
-    arguments.emplace_back(L"-eject");
-    arguments.emplace_back(L"-dao");
+    if (!request.verifyAfterBurn) {
+        arguments.emplace_back(L"-eject");
+    }
 
     const std::string extension =
         Lowercase(imagePath.extension().string());
 
+    // RB_STAGE44L_PS2CD_TAO_XA
+    //
+    // A single cooked 2048-byte PS2-CD ISO still needs CD-ROM XA Mode 2
+    // Form 1, but TAO avoids the DAO SEND CUE SHEET command rejected by
+    // some otherwise functional writers. CUE/BIN layouts keep DAO.
+    const bool ps2CdIso =
+        request.target ==
+            BurnTarget::PlayStation2Cd &&
+        extension == ".iso";
+
+    arguments.emplace_back(
+        ps2CdIso
+            ? L"-tao"
+            : L"-dao");
+
     if (extension == ".cue") {
         arguments.push_back(
             L"cuefile=" + imagePath.wstring());
+    } else if (
+        request.target == BurnTarget::PlayStation2Cd &&
+        extension == ".iso") {
+        // RB_STAGE44K_PS2CD_XA_MODE
+        //
+        // A 2048-byte PS2 CD ISO contains user data for CD-ROM XA
+        // Mode 2 Form 1 sectors. Let RetroBeam/cdrecord create the XA
+        // subheaders/ECC instead of writing an ordinary Mode-1 data track.
+        arguments.emplace_back(L"-xa");
+        arguments.push_back(imagePath.wstring());
     } else {
         arguments.emplace_back(L"-data");
         arguments.push_back(imagePath.wstring());
+    }
+
+    if (ps2CdIso) {
+        AppendLog(
+            "\r\nPS2 CD ISO recording mode: "
+            "TAO / CD-ROM XA Mode 2 Form 1\r\n");
+        AppendLog(
+            std::string("Post-burn verification: ") +
+            (request.verifyAfterBurn ? "ON" : "OFF") +
+            "\r\n");
     }
 
     static const std::regex progressPattern(
@@ -3037,11 +3315,32 @@ void BurnEngine::RunStandardImage(
             }
         };
 
+    // RB_STAGE44L_FAILURE_STATUS
+    std::string retroBeamBurnOutput;
+
+    const auto appendBurnOutput =
+        [this,
+         &retroBeamBurnOutput](
+            const std::string& text) {
+            retroBeamBurnOutput +=
+                text;
+
+            if (retroBeamBurnOutput.size() >
+                65536U) {
+                retroBeamBurnOutput.erase(
+                    0,
+                    retroBeamBurnOutput.size() -
+                        65536U);
+            }
+
+            AppendLog(text);
+        };
+
     const ProcessResult result = RunHiddenProcess(
         retrobeam,
         arguments,
         workingDirectory,
-        append,
+        appendBurnOutput,
         parseLine);
 
     if (!result.started) {
@@ -3050,10 +3349,94 @@ void BurnEngine::RunStandardImage(
     }
 
     if (result.exitCode != 0) {
+        const std::string detail =
+            SummarizeRetroBeamFailure(
+                retroBeamBurnOutput);
+
         SetFailure(
-            std::string(BurnTargetName(request.target)) +
-            " write failed. The disc may be incomplete; check the burn log.");
+            detail.empty()
+                ? std::string(
+                      BurnTargetName(
+                          request.target)) +
+                      " RetroBeam write failed. See Burn Log for full backend output."
+                : "RetroBeam burn failed: " +
+                      detail);
         return;
+    }
+
+
+    // Explicit optional verification. Unchecked requests never enter here.
+    if (request.verifyAfterBurn &&
+        request.target ==
+            BurnTarget::PlayStation2Cd &&
+        extension == ".iso") {
+        {
+            std::lock_guard lock(mutex_);
+
+            state_.writing = false;
+            state_.progress = 0.999F;
+            state_.bufferPercent = -1;
+            state_.ringBufferPercent = -1;
+            state_.driveBufferPercent = -1;
+            state_.actualSpeed.clear();
+            state_.remainingTime.clear();
+            state_.status =
+                "Verifying Disc... 0%";
+        }
+
+        Sleep(500);
+
+        const WindowsOpticalVerifyResult verification =
+            VerifyWindowsOpticalSectors(
+                request.opticalDriveRoot,
+                imagePath,
+                [this](
+                    const std::uint32_t completed,
+                    const std::uint32_t total) {
+                    const unsigned percent =
+                        total == 0
+                            ? 100U
+                            : static_cast<unsigned>(
+                                  std::min<std::uint64_t>(
+                                      100ULL,
+                                      (static_cast<std::uint64_t>(
+                                           completed) *
+                                       100ULL) /
+                                          total));
+
+                    std::lock_guard lock(mutex_);
+
+                    state_.writing = false;
+                    state_.progress = 0.999F;
+                    state_.status =
+                        "Verifying Disc... " +
+                        std::to_string(percent) +
+                        "%";
+                });
+
+        AppendLog(
+            "\r\n===== Windows optical verification =====\r\n"
+            "source=" +
+            imagePath.string() +
+            "\r\nsector_count=" +
+            std::to_string(
+                verification.sectorCount) +
+            "\r\nbytes_compared=" +
+            std::to_string(
+                verification.bytesCompared) +
+            "\r\nverify_success=" +
+            std::string(
+                verification.success
+                    ? "yes"
+                    : "no") +
+            "\r\n");
+
+        if (!verification.success) {
+            SetFailure(
+                "Post-burn verification failed: " +
+                verification.error);
+            return;
+        }
     }
 
     PlayBurnCompleteSound();

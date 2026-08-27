@@ -70,6 +70,14 @@ struct BurnRequest final {
     // available for A/B testing and drive/media compatibility.
     bool useGrowisofsForDvd = false;
 
+    // RB_STAGE44M_OPTIONAL_VERIFY_FLAG
+    //
+    // Optional, explicit post-burn full logical-sector readback.
+    // OFF by default. The 0.5.0 UI currently exposes this only for
+    // single-track PS2 CD .iso burns, whose 2048-byte logical sectors
+    // can be compared directly with the source ISO on both OSes.
+    bool verifyAfterBurn = false;
+
     bool checkOnly = false;
     bool simulate = false;   // no-write preflight for DVD targets.
     bool burnerMaxOnly = false; // Test/enable BurnerMAX without writing disc sectors.

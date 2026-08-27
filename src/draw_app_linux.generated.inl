@@ -1,6 +1,6 @@
 // AUTO-GENERATED. DO NOT EDIT BY HAND.
 // Source of truth: src/main.cpp :: DrawApp()
-// Windows DrawApp SHA-256: 2c1b2ea1ddff64b37b966b95e75b1bbda21af3c582a222b200d8130ae2e8fab0
+// Windows DrawApp SHA-256: d929557639d1508ec407452e7293b26f600c372d39a79e7cbfb0c3ccbd9d0561
 // Linux platform substitutions: optical roots=2, BurnerMAX roots=1, D3D texture handle -> OpenGL ID.
 
 void DrawApp(
@@ -70,8 +70,27 @@ void DrawApp(
             discSize,
             discAngle);
 
-        if (burn.writing || burn.stage == BurnStage::Complete ||
-            (burn.stage == BurnStage::Failed && burn.progress > 0.0F)) {
+        // RB_STAGE44J_PERSISTENT_BURN_LIFECYCLE_PANEL
+        //
+        // Keep the burn panel visible for the whole burn lifecycle, including
+        // post-write verification. Linux PS2-CD deliberately sets writing=false
+        // before direct SG_IO readback while the job is still busy.
+        const bool burnLifecycleActive =
+            burn.stage == BurnStage::BurningSession1 ||
+            burn.stage == BurnStage::BurningSession2;
+
+        // RB_STAGE44L_FIRST_CLASS_FAILURE_UI
+        //
+        // A backend can fail before sector 0 (for example, a drive rejecting
+        // SEND CUE SHEET / lead-in parameters). That is still a burn result
+        // and must remain visible in the main burn panel.
+        const bool burnPanelVisible =
+            burn.writing ||
+            burnLifecycleActive ||
+            burn.stage == BurnStage::Complete ||
+            burn.stage == BurnStage::Failed;
+
+        if (burnPanelVisible) {
             const int percent = static_cast<int>(std::lround(burn.progress * 100.0F));
             char progressLabel[32]{};
             snprintf(progressLabel, sizeof(progressLabel), "%d%%", percent);
@@ -115,6 +134,36 @@ void DrawApp(
             if (burn.stage == BurnStage::Complete) {
                 DrawCenteredSuccessText(artSize);
             } else {
+                // RB_STAGE44I_VISIBLE_LIVE_BURN_PHASE
+                //
+                // Critical burn telemetry belongs beside the disc/progress
+                // display, not only in the controls column.
+                if ((burnLifecycleActive ||
+                     burn.stage == BurnStage::Failed) &&
+                    !burn.status.empty()) {
+                    ImGui::Spacing();
+
+                    if (burn.stage ==
+                        BurnStage::Failed) {
+                        ImGui::TextColored(
+                            ImVec4(
+                                1.00F,
+                                0.36F,
+                                0.30F,
+                                1.00F),
+                            "FAILED");
+                        ImGui::TextWrapped(
+                            "%s",
+                            burn.status.c_str());
+                    } else {
+                        ImGui::TextDisabled(
+                            "PHASE");
+                        ImGui::SameLine();
+                        ImGui::TextUnformatted(
+                            burn.status.c_str());
+                    }
+                }
+
                 std::string burnDetails;
             // RB_FIXED_WIDTH_BURN_SPEED_V2
             // Reserve five columns for live optical write speed so
@@ -225,8 +274,13 @@ void DrawApp(
                                 "%";
                         }
                     }
-                } else {
-                    burnDetails = "Burn failed";
+                } else if (
+                    burn.stage == BurnStage::Failed) {
+                    burnDetails =
+                        "See Burn Log for full backend output";
+                } else if (burnLifecycleActive) {
+                    burnDetails =
+                        "Readback verification in progress";
                 }
 
                 const float detailWidth =
@@ -656,6 +710,14 @@ void DrawApp(
             ConsoleProfile::Count;
         static std::uint64_t speedDefaultFingerprint = 0;
 
+        // RB_STAGE44E_EXPLICIT_AUTOMATIC_GUARD
+        //
+        // selectedSpeed == 0 is also used by several programmatic UI resets
+        // (image selection, refresh, burner/profile changes).  Zero must mean
+        // "Automatic" only when the user explicitly selected Automatic in
+        // this media context; otherwise restore the console-safe default.
+        static bool speedAutomaticExplicitlySelected = false;
+
         const bool speedContextChanged =
             !speedDefaultContextKnown ||
             speedDefaultDrive != currentSpeedDrive ||
@@ -671,6 +733,11 @@ void DrawApp(
             speedDefaultFingerprint =
                 speedContextFingerprint;
 
+            // A new drive/media/console context gets the safe recommendation.
+            // The user's explicit Automatic choice belongs only to the old
+            // context and must not leak into newly inserted media.
+            speedAutomaticExplicitlySelected = false;
+
             state.selectedSpeed =
                 speedMediaCompatible
                     ? recommendedSpeedIndex
@@ -683,6 +750,14 @@ void DrawApp(
             state.selectedSpeed >
             static_cast<int>(
                 drive->writeSpeeds.size())) {
+            state.selectedSpeed =
+                recommendedSpeedIndex;
+        } else if (
+            state.selectedSpeed == 0 &&
+            recommendedSpeedIndex > 0 &&
+            !speedAutomaticExplicitlySelected) {
+            // Repair any programmatic reset to Automatic while retaining the
+            // user's ability to explicitly choose Automatic from the combo.
             state.selectedSpeed =
                 recommendedSpeedIndex;
         }
@@ -727,6 +802,7 @@ void DrawApp(
                     "Automatic (drive/media)",
                     state.selectedSpeed == 0)) {
                 state.selectedSpeed = 0;
+                speedAutomaticExplicitlySelected = true;
             }
 
             if (drive != nullptr) {
@@ -757,6 +833,7 @@ void DrawApp(
                             selected)) {
                         state.selectedSpeed =
                             index + 1;
+                        speedAutomaticExplicitlySelected = false;
                     }
 
                     if (selected) {
@@ -1148,6 +1225,40 @@ void DrawApp(
             ImGui::Spacing();
         }
 
+        // RB_STAGE44M_OPTIONAL_VERIFY_UI
+        const bool verifyAfterBurnSupported =
+            state.selectedConsole ==
+                ConsoleProfile::PlayStation2Cd &&
+            LowerExtension(
+                state.selectedCdi) ==
+                L".iso";
+
+        if (!verifyAfterBurnSupported) {
+            // Prevent stale state leaking across profiles/layouts.
+            state.verifyAfterBurn = false;
+        }
+
+        if (state.selectedConsole ==
+            ConsoleProfile::PlayStation2Cd) {
+            ImGui::Spacing();
+
+            ImGui::BeginDisabled(
+                burn.busy ||
+                !verifyAfterBurnSupported);
+
+            ImGui::Checkbox(
+                "Verify disc after burn",
+                &state.verifyAfterBurn);
+
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+
+            ImGui::TextDisabled(
+                verifyAfterBurnSupported
+                    ? "optional full readback; default OFF"
+                    : "available for PS2 CD ISO only");
+        }
+
         const char* burnButtonLabel =
             xboxProfile
                 ? "BURN XBOX 360"
@@ -1426,6 +1537,8 @@ void DrawApp(
                         EffectiveAdvancedOptions(state, drive);
                     request.useGrowisofsForDvd =
                         state.useGrowisofsForDvd;
+                    request.verifyAfterBurn =
+                        state.verifyAfterBurn;
                     request.checkOnly = false;
                     request.simulate = false;
 

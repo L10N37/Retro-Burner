@@ -185,6 +185,8 @@ struct AppState final {
     Xbox360DiscType xbox360DiscType =
         Xbox360DiscType::Xgd2;
     bool useGrowisofsForDvd = false;
+    // RB_STAGE44M_VERIFY_UI_STATE
+    bool verifyAfterBurn = false;
     RetroBeamAdvancedOptions advanced;
     std::string status =
         "Choose a disc image and insert compatible blank media.";
@@ -341,6 +343,7 @@ void SelectCdi(
     state.selectedCdi =
         std::move(path);
     state.selectedSpeed = 0;
+    state.verifyAfterBurn = false;
     burnEngine.Reset();
 
     state.status =

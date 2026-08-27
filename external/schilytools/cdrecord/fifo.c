@@ -1,6 +1,6 @@
 /* @(#)fifo.c	1.66 15/04/22 Copyright 1989,1997-2015 J. Schilling */
-#ifdef _WIN32
 #include <retroburner/platform.h>
+#ifdef _WIN32
 #include <windows.h>
 #include <process.h>
 #endif

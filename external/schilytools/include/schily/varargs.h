@@ -34,4 +34,21 @@
 
 #include <stdarg.h>
 
+/*
+ * A va_list may be an array type. Keeping it inside a structure permits
+ * assignment/copying in the inherited recursive printf implementation.
+ */
+/* RETROBEAM_LINUX_VA_LIST_ABI_V10 */
+#ifndef __va_arg_list
+#ifdef VA_LIST_IS_ARRAY
+#define __va_arg_list(list) va_arg((list), void *)
+#else
+#define __va_arg_list(list) va_arg((list), va_list)
+#endif
+#endif
+
+typedef struct {
+    va_list ap;
+} va_lists_t;
+
 #endif /* _SCHILY_VARARGS_H */

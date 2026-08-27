@@ -1,9 +1,257 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(RetroBurner VERSION 0.4.0 LANGUAGES C CXX RC)
+project(RetroBurner VERSION 0.4.0 LANGUAGES C CXX)
+
+# The Windows resource compiler is only required for the native Win32 GUI.
+# Keeping RC out of the project language list lets the same top-level CMake
+# configure on Linux without changing the Windows build.
+if(WIN32)
+    enable_language(RC)
+endif()
 
 if(NOT WIN32)
-    message(FATAL_ERROR "Retro Burner is a native Windows application. Configure it on Windows.")
+    # Native Linux application bring-up.
+    #
+    # Windows continues through the original Win32/DX11 build below. Linux
+    # uses SDL3 + OpenGL3 and the sysfs optical drive-manager implementation.
+    set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui")
+
+    foreach(required_imgui_file
+            imgui.cpp
+            imgui_draw.cpp
+            imgui_tables.cpp
+            imgui_widgets.cpp
+            backends/imgui_impl_sdl3.cpp
+            backends/imgui_impl_sdl3.h
+            backends/imgui_impl_opengl3.cpp
+            backends/imgui_impl_opengl3.h
+            backends/imgui_impl_opengl3_loader.h)
+        if(NOT EXISTS "${IMGUI_DIR}/${required_imgui_file}")
+            message(FATAL_ERROR
+                "Missing Dear ImGui Linux file: ${IMGUI_DIR}/${required_imgui_file}")
+        endif()
+    endforeach()
+
+    find_package(OpenGL REQUIRED)
+    find_package(SDL3_image CONFIG REQUIRED)
+
+    if(TARGET SDL3_image::SDL3_image)
+        set(RB_SDL3_IMAGE_TARGET SDL3_image::SDL3_image)
+    elseif(TARGET SDL3_image::SDL3_image-shared)
+        set(RB_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-shared)
+    else()
+        message(FATAL_ERROR "SDL3_image CMake target not found")
+    endif()
+    find_package(Threads REQUIRED)
+
+    find_package(SDL3 CONFIG QUIET)
+    if(TARGET SDL3::SDL3)
+        set(RB_SDL3_TARGET SDL3::SDL3)
+    else()
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+        set(RB_SDL3_TARGET PkgConfig::SDL3)
+    endif()
+
+    add_library(imgui_linux STATIC
+        "${IMGUI_DIR}/imgui.cpp"
+        "${IMGUI_DIR}/imgui_draw.cpp"
+        "${IMGUI_DIR}/imgui_tables.cpp"
+        "${IMGUI_DIR}/imgui_widgets.cpp"
+        "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
+        "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp"
+    )
+
+    target_include_directories(imgui_linux PUBLIC
+        "${IMGUI_DIR}"
+        "${IMGUI_DIR}/backends"
+    )
+
+    target_link_libraries(imgui_linux PUBLIC
+        ${RB_SDL3_TARGET}
+        ${RB_SDL3_IMAGE_TARGET}
+        OpenGL::GL
+    )
+
+    target_compile_features(imgui_linux PUBLIC cxx_std_20)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(imgui_linux PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+        )
+    endif()
+
+    add_library(retroburner_drive_manager STATIC
+        src/drive_manager_linux.cpp
+        src/drive_manager.h
+    )
+
+    target_include_directories(retroburner_drive_manager PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_compile_features(retroburner_drive_manager PUBLIC cxx_std_20)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(retroburner_drive_manager PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+        )
+    endif()
+
+    add_executable(RetroBurner
+        src/main_linux.cpp
+        src/process_runner_linux.cpp
+        src/process_runner.h
+        src/retrobeam_linux.cpp
+        src/retrobeam_linux.h
+        src/optical_verify_linux.cpp
+        src/optical_verify_linux.h
+        src/burn_engine_linux.cpp
+        src/burnermax_linux.cpp
+        src/burnermax.h
+        src/burn_engine.h
+        src/texture_loader_linux.cpp
+        src/texture_loader_linux.h
+    
+    src/retrobeam_progress.cpp
+    src/retrobeam_progress.h)
+
+    target_link_libraries(RetroBurner PRIVATE
+        imgui_linux
+        retroburner_drive_manager
+        ${RB_SDL3_TARGET}
+        OpenGL::GL
+        Threads::Threads
+    )
+
+    target_compile_features(RetroBurner PRIVATE cxx_std_20)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(RetroBurner PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+        )
+    endif()
+
+    set_target_properties(RetroBurner PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        OUTPUT_NAME "RetroBurner"
+    )
+
+    add_custom_command(TARGET RetroBurner POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:RetroBurner>/assets"
+        COMMENT "Copying Retro Burner artwork/assets for Linux runtime"
+    )
+
+    # Keep the text probe available as a small diagnostics target, but the
+    # native GUI is now the primary Linux application target.
+    add_executable(RetroBurnerDriveProbe EXCLUDE_FROM_ALL
+        cmake/retroburner-drive-probe/drive_probe_main.cpp
+    )
+
+    target_link_libraries(RetroBurnerDriveProbe PRIVATE
+        retroburner_drive_manager
+    )
+
+    set_target_properties(RetroBurnerDriveProbe PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        OUTPUT_NAME "RetroBurnerDriveProbe"
+    )
+
+    install(TARGETS RetroBurner RUNTIME DESTINATION bin)
+
+    message(STATUS
+        "Retro Burner Linux: native SDL3/OpenGL3 application target enabled; "
+        "Windows continues to use Win32/DX11.")
+
+    # Do not parse the Windows-only resources, embedded PE tools, SPTI probes,
+    # or Direct3D targets below when configuring on Linux.
+
+# BEGIN RETROBURNER_LINUX_SINGLE_FILE
+if(UNIX AND NOT APPLE)
+    if(NOT DEFINED RETROBURNER_EMBED_RETROBEAM OR
+       NOT EXISTS "${RETROBURNER_EMBED_RETROBEAM}")
+        message(FATAL_ERROR
+            "RETROBURNER_EMBED_RETROBEAM must point to the freshly-built native Linux RetroBeam binary")
+    endif()
+
+    if(NOT DEFINED RETROBURNER_EMBED_ABGX360 OR
+       NOT EXISTS "${RETROBURNER_EMBED_ABGX360}")
+        message(FATAL_ERROR
+            "RETROBURNER_EMBED_ABGX360 must point to the freshly-built native Linux ABGX360 binary")
+    endif()
+
+    if(NOT DEFINED RETROBURNER_EMBED_CDIRIP OR
+       NOT EXISTS "${RETROBURNER_EMBED_CDIRIP}")
+        message(FATAL_ERROR
+            "RETROBURNER_EMBED_CDIRIP must point to the freshly-built native Linux cdirip binary")
+    endif()
+
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+    set(RETROBURNER_EMBED_GENERATED_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    set(RETROBURNER_EMBED_HEADER
+        "${RETROBURNER_EMBED_GENERATED_DIR}/embedded_bundle_linux.h")
+    set(RETROBURNER_EMBED_SOURCE
+        "${RETROBURNER_EMBED_GENERATED_DIR}/embedded_bundle_linux.cpp")
+
+    add_custom_command(
+        OUTPUT
+            "${RETROBURNER_EMBED_HEADER}"
+            "${RETROBURNER_EMBED_SOURCE}"
+        COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/scripts/internal/generate-linux-embedded-bundle.py"
+            --header "${RETROBURNER_EMBED_HEADER}"
+            --source "${RETROBURNER_EMBED_SOURCE}"
+            --asset "BurningDC.png=${CMAKE_SOURCE_DIR}/assets/BurningDC.png"
+            --asset "BurningPS1.png=${CMAKE_SOURCE_DIR}/assets/BurningPS1.png"
+            --asset "BurningPS2.png=${CMAKE_SOURCE_DIR}/assets/BurningPS2.png"
+            --asset "BurningSaturn.png=${CMAKE_SOURCE_DIR}/assets/BurningSaturn.png"
+            --asset "BurningXB360.png=${CMAKE_SOURCE_DIR}/assets/BurningXB360.png"
+            --asset "makeSpinDC.png=${CMAKE_SOURCE_DIR}/assets/makeSpinDC.png"
+            --asset "RetroBurner.png=${CMAKE_SOURCE_DIR}/assets/RetroBurner.png"
+            --asset "BurnComplete.wav=${CMAKE_SOURCE_DIR}/assets/mixkit-cartoon-monkey-mocking-laugh-107.wav"
+            --tool "retrobeam=${RETROBURNER_EMBED_RETROBEAM}"
+            --tool "abgx360=${RETROBURNER_EMBED_ABGX360}"
+            --tool "cdirip=${RETROBURNER_EMBED_CDIRIP}"
+        DEPENDS
+            "${CMAKE_SOURCE_DIR}/scripts/internal/generate-linux-embedded-bundle.py"
+            "${CMAKE_SOURCE_DIR}/assets/BurningDC.png"
+            "${CMAKE_SOURCE_DIR}/assets/BurningPS1.png"
+            "${CMAKE_SOURCE_DIR}/assets/BurningPS2.png"
+            "${CMAKE_SOURCE_DIR}/assets/BurningSaturn.png"
+            "${CMAKE_SOURCE_DIR}/assets/BurningXB360.png"
+            "${CMAKE_SOURCE_DIR}/assets/makeSpinDC.png"
+            "${CMAKE_SOURCE_DIR}/assets/RetroBurner.png"
+            "${CMAKE_SOURCE_DIR}/assets/mixkit-cartoon-monkey-mocking-laugh-107.wav"
+            "${RETROBURNER_EMBED_RETROBEAM}"
+            "${RETROBURNER_EMBED_ABGX360}"
+            "${RETROBURNER_EMBED_CDIRIP}"
+        VERBATIM
+        COMMENT
+            "Embedding Retro Burner Linux assets and native helper executables")
+
+    target_sources(
+        RetroBurner
+        PRIVATE
+            "${RETROBURNER_EMBED_SOURCE}")
+
+    target_include_directories(
+        RetroBurner
+        PRIVATE
+            "${RETROBURNER_EMBED_GENERATED_DIR}")
+endif()
+# END RETROBURNER_LINUX_SINGLE_FILE
+
+    return()
 endif()
 
 set(CMAKE_CXX_STANDARD 20)

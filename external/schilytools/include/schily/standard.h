@@ -37,6 +37,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <schily/type_val.h>
 
 #ifndef NULL
 #define NULL ((void *)0)
@@ -48,6 +49,7 @@
 #endif
 
 #define EX_BAD (-1)
+#define EX_CLASH (-64)
 
 #define GLOBAL extern
 #define IMPORT extern

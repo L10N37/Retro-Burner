@@ -1,6 +1,6 @@
 /* @(#)cdrecord.c	1.417 19/01/08 Copyright 1995-2019 J. Schilling */
-#ifdef _WIN32
 #include <retroburner/platform.h>
+#ifdef _WIN32
 #include <windows.h>
 #include <process.h>
 #endif
@@ -277,6 +277,10 @@ LOCAL	BOOL	check_wrmode	__PR((cdr_t *dp, uint32_t wmode, int tflags));
 LOCAL	void	set_wrmode	__PR((cdr_t *dp, uint32_t wmode, int tflags));
 LOCAL	void	linuxcheck	__PR((void));
 LOCAL	void	priv_warn	__PR((const char *what, const char *msg));
+#ifndef _WIN32
+EXPORT	void	priv_drop	__PR((void));
+EXPORT	BOOL	priv_eff_priv	__PR((int pname));
+#endif
 #ifdef	TR_DEBUG
 EXPORT	void	prtrack		__PR((track_t *trackp));
 #endif
@@ -702,9 +706,16 @@ main(ac, av)
 		auth = scg_version(scgp, SCG_AUTHOR);
 		if (lverbose > 1)
 			error(_("Using libscg transport code version '%s-%s'\n"), auth, vers);
-		if (auth == 0 || strcmp("schily", auth) != 0) {
+		/*
+		 * RetroBeam ships its own modified libscg transport and therefore
+		 * correctly reports author "RetroBeam" instead of impersonating the
+		 * original "schily" transport. Both are trusted by this executable.
+		 */
+		if (auth == 0 ||
+		    (strcmp("schily", auth) != 0 &&
+		     strcmp("RetroBeam", auth) != 0)) {
 			errmsgno(EX_BAD,
-			_("Warning: using inofficial libscg transport code version (%s-%s '%s').\n"),
+			_("Warning: using unrecognized libscg transport code version (%s-%s '%s').\n"),
 				auth, vers, scg_version(scgp, SCG_SCCS_ID));
 		}
 

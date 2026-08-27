@@ -36,6 +36,7 @@
 #include <retroburner/config.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <schily/archdefs.h>
 
 #ifdef _WIN32
 #define IS_GCC_WIN32 1

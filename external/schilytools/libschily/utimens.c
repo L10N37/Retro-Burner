@@ -24,6 +24,8 @@
 #include <schily/time.h>
 #include <schily/utime.h>
 #include <schily/fcntl.h>
+/* RETROBEAM_LINUX_UTIMENSAT_PROTO_V7 */
+#include <schily/stat.h>\t/* utimensat() declaration on POSIX/Linux */
 #include <schily/errno.h>
 #include <schily/standard.h>
 #include <schily/schily.h>

@@ -82,7 +82,7 @@ LOCAL	int	scgo_initiator_id __PR((SCSI *scgp));
 LOCAL	int	scgo_isatapi	__PR((SCSI *scgp));
 LOCAL	int	scgo_reset	__PR((SCSI *scgp, int what));
 
-LOCAL	char	_scg_auth_schily[]	= "schily";	/* The author for this module	*/
+LOCAL	char	_scg_auth_schily[]	= "RetroBeam";	/* The author for this module	*/
 
 EXPORT scg_ops_t scg_std_ops = {
 	scgo_send,

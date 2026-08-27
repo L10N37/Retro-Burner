@@ -129,7 +129,7 @@ static	char __sccsid[] =
  *	Choose your name instead of "schily" and make clear that the version
  *	string is related to a modified source.
  */
-LOCAL	char	_scg_trans_version[] = "scsi-linux-sg.c-1.98";	/* The version for this transport*/
+LOCAL	char	_scg_trans_version[] = "retrobeam-scsi-linux-sg-0.4";	/* The version for this transport*/
 
 #ifndef	SCSI_IOCTL_GET_BUS_NUMBER
 #define	SCSI_IOCTL_GET_BUS_NUMBER 0x5386
@@ -321,8 +321,8 @@ scgo_help(scgp, f)
 	SCSI	*scgp;
 	FILE	*f;
 {
-	__scg_help(f, "sg", "Generic transport independent SCSI",
-		"", "bus,target,lun", "1,2,0", TRUE, FALSE);
+	__scg_help(f, "sg", "Linux SCSI generic transport",
+		"", "bus,target,lun or /dev/sgX", "/dev/sg2", TRUE, TRUE);
 #ifdef	USE_PG
 	pg_help(scgp, f);
 #endif
@@ -555,18 +555,16 @@ openbydev:
 			if (b < 0 || b > 25)
 				b = -1;
 		}
-		if (scgp->overbose) {
+		if (scgp->overbose &&
+		    strncmp(device, "/dev/sg", 7) != 0 &&
+		    strncmp(device, "/dev/sr", 7) != 0) {
 			/*
-			 * Before you patch this away, are you sure that you
-			 * know what you are going to to?
-			 *
-			 * Note that this is a warning that helps users from
-			 * cdda2wav, mkisofs and other programs (that
-			 * distinguish SCSI addresses from file names) from
-			 * getting unexpected results.
+			 * RetroBeam intentionally supports explicit Linux optical
+			 * device nodes. Retain the inherited warning only for other
+			 * arbitrary legacy devname forms.
 			 */
 			js_fprintf((FILE *)scgp->errfile,
-			"Warning: Open by 'devname' is unintentional and not supported.\n");
+			"Warning: arbitrary open by 'devname' is not a supported RetroBeam transport.\n");
 		}
 					/* O_NONBLOCK is dangerous */
 		f = open(device, O_RDWR | O_NONBLOCK);

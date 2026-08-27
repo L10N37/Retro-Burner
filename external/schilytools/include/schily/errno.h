@@ -26,5 +26,11 @@
 #define _SCHILY_ERRNO_H
 
 #include <errno.h>
+#include <schily/prototyp.h>
+
+#ifndef seterrno
+extern int seterrno __PR((int));
+#endif
+extern int geterrno __PR((void));
 
 #endif /* _SCHILY_ERRNO_H */

@@ -59,6 +59,21 @@
 
 #endif /* _WIN32 */
 
+/* RETROBEAM_LINUX_O_SEARCH_V6
+ *
+ * POSIX O_SEARCH is not exposed as such by Linux. O_PATH is the closest
+ * Linux operation: obtain a path-only descriptor suitable for directory
+ * operations such as fchdir()/fstat(). Fall back to O_RDONLY only if a
+ * libc/kernel header does not expose O_PATH.
+ */
+#ifndef O_SEARCH
+# if defined(__linux__) && defined(O_PATH)
+#  define O_SEARCH O_PATH
+# else
+#  define O_SEARCH O_RDONLY
+# endif
+#endif
+
 #ifndef O_NDELAY
 #define O_NDELAY 0
 #endif

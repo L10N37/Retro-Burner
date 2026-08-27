@@ -29,9 +29,12 @@ struct BurnerMaxResult final {
 using BurnerMaxLogCallback =
     std::function<void(const std::string&)>;
 
-// Applies the volatile BurnerMAX payload used by compatible MediaTek-based
-// DVD writers. No disc sectors are written. The result is accepted only if
-// the drive subsequently reports the XGD3 layer boundary (2133520).
+#ifdef _WIN32
 [[nodiscard]] BurnerMaxResult EnableBurnerMax(
     const std::wstring& opticalDriveRoot,
     const BurnerMaxLogCallback& log);
+#else
+[[nodiscard]] BurnerMaxResult EnableBurnerMax(
+    const std::string& opticalSgDevice,
+    const BurnerMaxLogCallback& log);
+#endif

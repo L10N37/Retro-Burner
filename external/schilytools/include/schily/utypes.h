@@ -31,8 +31,25 @@
 #include <sys/types.h>
 
 /*
- * Legacy Schily integer aliases were intentionally removed.
- * Active RetroBurner code uses standard C integer types directly.
+ * Legacy Schily aliases retained at the portability boundary.
+ * The modern build maps them directly onto C99 fixed-width types.
  */
+typedef int8_t      Int8_t;
+typedef uint8_t     UInt8_t;
+typedef int16_t     Int16_t;
+typedef uint16_t    UInt16_t;
+typedef int32_t     Int32_t;
+typedef uint32_t    UInt32_t;
+typedef int64_t     Int64_t;
+typedef uint64_t    UInt64_t;
+typedef intptr_t    Intptr_t;
+typedef uintptr_t   UIntptr_t;
+
+typedef unsigned char      Uchar;
+typedef unsigned short     Ushort;
+typedef unsigned int       Uint;
+typedef unsigned long      Ulong;
+typedef long long          Llong;
+typedef unsigned long long Ullong;
 
 #endif /* _SCHILY_UTYPES_H */

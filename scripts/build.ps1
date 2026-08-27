@@ -102,7 +102,7 @@ if ([string]::IsNullOrWhiteSpace($generator)) {
 
 # RetroBeam is RetroBurner's recording backend. Build/stage it before MSVC
 # configures the GUI so the exact current backend is embedded in RetroBurner.exe.
-$retroBeamBuild = Join-Path $projectRoot "build-retrobeam-win.ps1"
+$retroBeamBuild = Join-Path $PSScriptRoot "internal\build-retrobeam-win.ps1"
 if (-not (Test-Path -LiteralPath $retroBeamBuild)) {
     throw "RetroBeam build script is missing: $retroBeamBuild"
 }

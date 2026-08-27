@@ -20,6 +20,15 @@
 #cmakedefine HAVE_PUTENV 1
 #cmakedefine HAVE_STRERROR 1
 
+/* Modern compiler / libc facts used by the inherited Schily headers. */
+#cmakedefine HAVE_C_BITFIELDS 1
+#cmakedefine BITFIELDS_HTOL 1
+#cmakedefine HAVE_C_BIGENDIAN 1
+#cmakedefine WORDS_BIGENDIAN 1
+#cmakedefine HAVE_STRUCT_RUSAGE 1
+#cmakedefine HAVE_TYPE_RLIM_T 1
+#cmakedefine NO_SCHILY_FEXEC 1
+
 #define HAVE_STDC_HEADERS 1
 #define STDC_HEADERS 1
 #define HAVE_STRUCT_TIMEVAL 1
@@ -39,6 +48,167 @@
 #define HOST_CPU "@CMAKE_SYSTEM_PROCESSOR@"
 #define HOST_VENDOR "RetroBurner"
 #define HOST_OS "@CMAKE_SYSTEM_NAME@"
+
+
+/* RETROBEAM_LINUX_LIBC_CONTRACT_V5
+ *
+ * Modern Linux/glibc contract for the inherited Schily portability layer.
+ * These replace configure-era xconfig probes for RetroBeam's supported
+ * Linux target. Do not apply this block to Windows.
+ */
+#if defined(__linux__)
+
+#define HAVE_STDARG_H 1
+#define HAVE_LIMITS_H 1
+#define HAVE_FCNTL_H 1
+#define HAVE_DIRENT_H 1
+#define HAVE_GRP_H 1
+#define HAVE_PWD_H 1
+#define HAVE_LOCALE_H 1
+#define HAVE_CTYPE_H 1
+#define HAVE_WCHAR_H 1
+#define HAVE_WCTYPE_H 1
+#define HAVE_FLOAT_H 1
+#define HAVE_MATH_H 1
+#define HAVE_STRING_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_TIME_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_IOCTL_H 1
+/* RETROBEAM_LINUX_FIFO_FACTS_V14 */
+/*
+ * Native Linux cdrecord FIFO requirements.
+ * fifo.c keeps FIFO enabled only when both a shared-memory mechanism
+ * and fork() were detected by the historical Schily configure probes.
+ * CMake supplies those probe results explicitly.
+ */
+#if defined(__linux__)
+#define HAVE_FORK 1
+#define HAVE_SMMAP 1
+#endif
+
+/* RETROBEAM_LINUX_SG_HEADER_PROBES_V11 */
+#define HAVE_SCSI_SCSI_H 1
+#define HAVE_SCSI_SG_H 1
+/* Old Schily libscg selects Linux with the historical 'linux' macro. */
+#ifndef linux
+#define linux 1
+#endif
+#define HAVE_SYS_PARAM_H 1
+#define HAVE_NETDB_H 1
+#define HAVE_UTSNAME_H 1
+/* RETROBEAM_LINUX_SYS_UTSNAME_V8 */
+#define HAVE_SYS_UTSNAME_H 1
+/* RETROBEAM_LINUX_VA_LIST_ARRAY_V10 */
+#if defined(__linux__) && defined(__x86_64__)
+#define VA_LIST_IS_ARRAY 1
+#endif
+#define HAVE_FNMATCH_H 1
+
+#define HAVE_SETLOCALE 1
+#define HAVE_GETDELIM 1
+#define HAVE_GETHOSTNAME 1
+#define HAVE_GETDOMAINNAME 1
+#define HAVE_GETHOSTID 1
+#define HAVE_GETGRENT 1
+#define HAVE_GETPWENT 1
+#define HAVE_FCHMODAT 1
+#define HAVE_FACCESSAT 1
+#define HAVE_FCHDIR 1
+#define HAVE_UNAME 1
+#define HAVE_GETPAGESIZE 1
+#define HAVE_GETDTABLESIZE 1
+#define HAVE_GETLOGIN 1
+#define HAVE_MKSTEMP 1
+#define HAVE_WAITID 1
+#define HAVE_EACCESS 1
+
+#define HAVE_STRTOD 1
+#define HAVE_ECVT 1
+#define HAVE_FCVT 1
+#define HAVE_GCVT 1
+#define HAVE_SNPRINTF 1
+#define HAVE_VSNPRINTF 1
+#define HAVE_STRCASECMP 1
+#define HAVE_STRNCASECMP 1
+#define HAVE_STRDUP 1
+#define HAVE_STRNDUP 1
+#define HAVE_STRNLEN 1
+#define HAVE_UNSETENV 1
+
+#define HAVE_VA_COPY 1
+#define HAVE_MBTOWC 1
+#define HAVE_WCTOMB 1
+#define HAVE_MBRTOWC 1
+#define HAVE_WCRTOMB 1
+#define HAVE_MBSINIT 1
+#define HAVE_WCWIDTH 1
+#define HAVE_ISWPRINT 1
+#define HAVE_WCTYPE 1
+#define HAVE_ISWCTYPE 1
+#define HAVE_ISBLANK 1
+
+#define HAVE_C99_ISNAN 1
+#define HAVE_C99_ISINF 1
+#define HAVE_CHMOD 1
+#define HAVE_FNMATCH 1
+#define HAVE_LONGLONG 1
+
+#define SIZEOF_LONG_INT 8
+#define SIZEOF_LONG 8
+#define SIZEOF_SSIZE_T 8
+#define SIZEOF_WCHAR 4
+#define SIZEOF_WCHAR_T 4
+
+
+/* RETROBEAM_LINUX_LIBC_CONTRACT_V6 */
+
+/*
+ * Fedora/glibc already supplies these interfaces. The corresponding
+ * libschily source files are portability fallbacks and should compile to
+ * empty objects on the supported Linux target.
+ */
+#define HAVE_LIBGEN_H 1
+#define HAVE_BASENAME 1
+#define HAVE_DIRNAME 1
+
+#define HAVE_FSTATAT 1
+#define HAVE_OPENAT 1
+#define HAVE_UTIMENSAT 1
+#define HAVE_FUTIMENS 1
+#define HAVE_LSTAT 1
+
+#define HAVE_SIGNAL_H 1
+#define HAVE_SYS_WAIT_H 1
+#define HAVE_TYPE_SIGINFO_T 1
+#define HAVE_TYPE_IDTYPE_T 1
+
+#define HAVE_STRCHR 1
+#define HAVE_STRRCHR 1
+#define HAVE_STRSTR 1
+
+#define HAVE_WCSCHR 1
+#define HAVE_WCSRCHR 1
+#define HAVE_WCSSTR 1
+#define HAVE_WCSTOL 1
+
+/*
+ * Schily's fexec* and getline APIs pre-date the later POSIX functions with
+ * colliding names. These RAW_* markers are the upstream mechanism that
+ * makes system headers get included before the Schily aliases are installed.
+ */
+#define HAVE_RAW_FEXECVE 1
+#define HAVE_RAW_GETLINE 1
+
+/*
+ * Stage 2 temporarily disabled Schily's fexec aliases to get past a missing
+ * configure result. The RAW_FEXECVE route above is the proper Linux fix.
+ */
+#ifdef NO_SCHILY_FEXEC
+#undef NO_SCHILY_FEXEC
+#endif
+
+#endif /* __linux__ */
 
 #define IS_SCHILY_XCONFIG 1
 

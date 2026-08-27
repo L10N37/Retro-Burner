@@ -92,40 +92,40 @@
 
 #ifdef	__HPUX_HPPA_CC32
 #include <schily/hppa-hp-ux-cc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__HPUX_HPPA_CC64
 #include <schily/hppa-hp-ux-cc64/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__HPUX_HPPA_GCC32
 #include <schily/hppa-hp-ux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__HPUX_HPPA_GCC64
 #include <schily/hppa-hp-ux-gcc64/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 
 #ifdef	__LINUX_ARMV6L_GCC32
 #include <schily/armv6l-linux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__LINUX_ARMV5L_GCC32
 #include <schily/armv6l-linux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__LINUX_ARMV5TEJL_GCC32
 #include <schily/armv5tejl-linux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__LINUX_I386_GCC32
 #include <schily/i686-linux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 #ifdef	__LINUX_amd64_GCC64
 #include <schily/x86_64-linux-gcc/avoffset.h>
-#define	__JS_ARCH_CONF_INCL
+#define	__JS_ARCH_AVOFFSET_INCL
 #endif
 
 #ifdef	__MSWIN_X86_CL32

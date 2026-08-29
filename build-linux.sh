@@ -261,14 +261,26 @@ if ((INSTALL_DESKTOP)); then
     APP_ID="io.github.L10N37.RetroBurner"
     ICON_DIR="${HOME}/.local/share/icons/hicolor/256x256/apps"
     DESKTOP_DIR="${HOME}/.local/share/applications"
+    LAUNCHER_DIR="${HOME}/.local/bin"
+    LAUNCHER="${LAUNCHER_DIR}/retroburner-current"
 
     mkdir -p \
         "$ICON_DIR" \
-        "$DESKTOP_DIR"
+        "$DESKTOP_DIR" \
+        "$LAUNCHER_DIR"
 
     install -m 0644 \
         "$ROOT/assets/RetroBurner.png" \
         "$ICON_DIR/${APP_ID}.png"
+
+    # Use a stable launcher path with no spaces. The actual build can live
+    # anywhere, including Windows/NTFS paths containing spaces.
+    cat > "$LAUNCHER" <<EOF
+#!/usr/bin/env bash
+exec "$APP" "\$@"
+EOF
+
+    chmod 0755 "$LAUNCHER"
 
     cat > "$DESKTOP_DIR/${APP_ID}.desktop" <<EOF
 [Desktop Entry]
@@ -276,7 +288,7 @@ Type=Application
 Version=1.0
 Name=Retro Burner
 Comment=Native retro console optical disc burner
-Exec=${APP}
+Exec=${LAUNCHER}
 Icon=${APP_ID}
 Terminal=false
 Categories=Utility;

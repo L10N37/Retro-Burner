@@ -2917,7 +2917,12 @@ void BurnEngine::RunStandardImage(
                     // RB_RETROBEAM_PHASE_TEXT_V84B
                     std::string backendPhase;
                     if (ContainsCaseInsensitive(line, "lead-in") ||
-                        ContainsCaseInsensitive(line, "leadin")) {
+                        ContainsCaseInsensitive(line, "leadin") ||
+                        ContainsCaseInsensitive(line, "starting real sao write") ||
+                        ContainsCaseInsensitive(line, "waiting for reader process") ||
+                        ContainsCaseInsensitive(line, "performing opc") ||
+                        ContainsCaseInsensitive(line, "sending cue sheet") ||
+                        ContainsCaseInsensitive(line, "writing pregap")) {
                         backendPhase = "Writing Lead-In...";
                     } else if (
                         ContainsCaseInsensitive(line, "starting new track") ||
@@ -3537,22 +3542,6 @@ void BurnEngine::RunStandardImage(
                       " RetroBeam write failed. See Burn Log for full backend output."
                 : "RetroBeam burn failed: " +
                       detail);
-        return;
-    }
-
-
-    if (request.simulate) {
-        std::lock_guard lock(mutex_);
-        state_.stage = BurnStage::Ready;
-        state_.busy = false;
-        state_.writing = false;
-        state_.progress = 0.0F;
-        state_.bufferPercent = -1;
-        state_.ringBufferPercent = -1;
-        state_.driveBufferPercent = -1;
-        state_.remainingTime.clear();
-        state_.status =
-            "RetroBeam dummy CD write passed. No disc sectors were written.";
         return;
     }
 

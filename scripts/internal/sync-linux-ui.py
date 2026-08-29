@@ -222,6 +222,35 @@ if missing_from_linux:
         + "\n  ".join(missing_from_linux)
     )
 
+# RB_STAGE44W_CANONICAL_BURN_PRESENTATION
+# Buffer telemetry has dedicated graphical bars. Prevent a future edit from
+# quietly re-introducing profile-specific textual buffer percentages.
+canonical_marker = "RB_STAGE44W_CANONICAL_BURN_PRESENTATION"
+if canonical_marker not in windows_draw_app:
+    raise RuntimeError("Windows DrawApp lost the canonical burn presentation marker.")
+if canonical_marker not in linux_draw_app:
+    raise RuntimeError("Generated Linux DrawApp lost the canonical burn presentation marker.")
+
+canonical_start = linux_draw_app.find(canonical_marker)
+canonical_end = linux_draw_app.find(
+    "const float detailWidth =",
+    canonical_start,
+)
+if canonical_start < 0 or canonical_end < 0:
+    raise RuntimeError("Could not isolate canonical Linux burn detail block.")
+
+canonical_details = linux_draw_app[canonical_start:canonical_end]
+for forbidden in (
+    "burn.bufferPercent",
+    "burn.ringBufferPercent",
+    "burn.driveBufferPercent",
+):
+    if forbidden in canonical_details:
+        raise RuntimeError(
+            "Canonical burn detail row reintroduced graphical buffer telemetry: "
+            + forbidden
+        )
+
 header = (
     "// AUTO-GENERATED. DO NOT EDIT BY HAND.\n"
     "// Source of truth: src/main.cpp :: DrawApp()\n"

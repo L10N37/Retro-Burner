@@ -118,6 +118,16 @@ public:
         std::wstring opticalDriveRoot);
 
     [[nodiscard]] BurnSnapshot Snapshot() const;
+
+    // RB_STAGE44X_UI_BURN_SIMULATION
+    // Engineering-only synthetic snapshot injection. This does not launch
+    // any backend or access an optical device.
+    void InjectUiSimulationSnapshot(
+        const BurnSnapshot& snapshot) {
+        std::lock_guard lock(mutex_);
+        state_ = snapshot;
+    }
+
     void Reset();
 
     // Used by XGD3 preparation callbacks to surface copy/ABGX360 progress.

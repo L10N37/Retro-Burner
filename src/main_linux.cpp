@@ -14,6 +14,7 @@
 #include "process_runner.h"
 #include "retrobeam_linux.h"
 #include "texture_loader_linux.h"
+#include "ui_burn_simulation.h"
 
 #include <algorithm>
 #include <array>
@@ -1743,7 +1744,11 @@ int RunGui(
 
     AppState state;
     BurnEngine burnEngine;
-    RefreshDrives(state);
+
+    // UI simulation is synthetic and performs no optical enumeration/write.
+    if (!UiBurnSimulationRequested()) {
+        RefreshDrives(state);
+    }
 
     BurnStage lastCompletionSoundStage =
         BurnStage::Idle;

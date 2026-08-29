@@ -1,6 +1,6 @@
 // AUTO-GENERATED. DO NOT EDIT BY HAND.
 // Source of truth: src/main.cpp :: DrawApp()
-// Windows DrawApp SHA-256: d929557639d1508ec407452e7293b26f600c372d39a79e7cbfb0c3ccbd9d0561
+// Windows DrawApp SHA-256: 2d281550b84b14b38a4b7cd3f131d18f76de3428426d98a6d8eea6ecc02dacc6
 // Linux platform substitutions: optical roots=2, BurnerMAX roots=1, D3D texture handle -> OpenGL ID.
 
 void DrawApp(
@@ -9,6 +9,66 @@ void DrawApp(
     const std::array<LinuxTexture, kConsoleProfileCount>& artworks,
     const LinuxTexture& disc) {
     const ImGuiIO& io = ImGui::GetIO();
+
+    // RB_STAGE44X_UI_BURN_SIMULATION
+    // Hidden no-disc engineering mode. The exact same DrawApp executes on
+    // Windows and Linux, so these synthetic frames expose visual parity bugs
+    // without consuming CD-R/DVD media.
+    const bool uiSimulationActive =
+        UiBurnSimulationRequested();
+    std::string uiSimulationLabel;
+
+    if (uiSimulationActive) {
+        const UiBurnSimulationFrame simulation =
+            BuildUiBurnSimulationFrame(
+                UiBurnSimulationRequest(),
+                ImGui::GetTime());
+
+        switch (simulation.target) {
+        case BurnTarget::Dreamcast:
+            state.selectedConsole =
+                ConsoleProfile::Dreamcast;
+            break;
+        case BurnTarget::PlayStation:
+            state.selectedConsole =
+                ConsoleProfile::PlayStation;
+            break;
+        case BurnTarget::PlayStation2Cd:
+            state.selectedConsole =
+                ConsoleProfile::PlayStation2Cd;
+            break;
+        case BurnTarget::PlayStation2Dvd:
+            state.selectedConsole =
+                ConsoleProfile::PlayStation2Dvd;
+            break;
+        case BurnTarget::Saturn:
+            state.selectedConsole =
+                ConsoleProfile::Saturn;
+            break;
+        case BurnTarget::Xbox360:
+            state.selectedConsole =
+                ConsoleProfile::Xbox360;
+            break;
+        }
+
+        state.xbox360DiscType =
+            simulation.xbox360DiscType;
+        state.useGrowisofsForDvd =
+            simulation.useGrowisofsForDvd;
+        state.selectedCdi =
+            simulation.imagePath;
+        state.drives.assign(
+            1,
+            simulation.drive);
+        state.selectedDrive = 0;
+
+        burnEngine.InjectUiSimulationSnapshot(
+            simulation.burn);
+
+        uiSimulationLabel =
+            simulation.label;
+    }
+
     const BurnSnapshot burn = burnEngine.Snapshot();
     const int consoleIndex = std::clamp(
         static_cast<int>(state.selectedConsole),
@@ -31,6 +91,14 @@ void DrawApp(
     ImGui::SetWindowFontScale(1.0F);
     ImGui::SameLine();
     ImGui::TextDisabled("  %s", ConsoleSubtitle(state.selectedConsole));
+
+    if (uiSimulationActive) {
+        ImGui::TextColored(
+            ImVec4(1.00F, 0.62F, 0.24F, 1.00F),
+            "UI SIMULATION - NO DISC WRITE - %s",
+            uiSimulationLabel.c_str());
+    }
+
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -102,7 +170,7 @@ void DrawApp(
 
             // RB_IMGBURN_STYLE_BUFFER_BARS_V84B
             if (burn.writing && burn.ringBufferPercent >= 0) {
-                ImGui::TextDisabled("Buffer");
+                ImGui::TextDisabled("FIFO / Read Buffer");
                 char fifoLabel[16]{};
                 snprintf(
                     fifoLabel,
@@ -164,115 +232,61 @@ void DrawApp(
                     }
                 }
 
+                // RB_STAGE44W_CANONICAL_BURN_PRESENTATION
+                //
+                // One presentation contract for every console and both OSes:
+                //
+                //   main progress bar
+                //   FIFO / Read Buffer graphical bar (when backend reports it)
+                //   Device Buffer graphical bar    (when backend reports it)
+                //   PHASE
+                //   Session / Speed / Remaining text only
+                //
+                // Buffer percentages must NEVER be repeated in this compact
+                // text row; they already have dedicated graphical bars above.
                 std::string burnDetails;
-            // RB_FIXED_WIDTH_BURN_SPEED_V2
-            // Reserve five columns for live optical write speed so
-            // 9.x -> 10.x/48.x never moves the following status fields.
-            const auto FixedBurnSpeed =
-                [](const std::string& speed) {
-                    if (speed.size() >= 5) {
-                        return speed;
-                    }
-                    return std::string(
-                               5 - speed.size(),
-                               ' ') +
-                           speed;
-                };
+
+                // Reserve five columns for live optical write speed so
+                // 9.x -> 10.x/48.x never moves following status fields.
+                const auto FixedBurnSpeed =
+                    [](const std::string& speed) {
+                        if (speed.size() >= 5) {
+                            return speed;
+                        }
+                        return std::string(
+                                   5 - speed.size(),
+                                   ' ') +
+                               speed;
+                    };
+
                 if (burn.writing) {
-                    if (IsDvdProfile(state.selectedConsole)) {
-                        // RB_COMPACT_DVD_BURN_STATUS_V84L
-                        // Buffer health already has dedicated graphical bars.
-                        // Keep the compact text row to the two values that are
-                        // not otherwise obvious at a glance.
-                        if (!burn.actualSpeed.empty()) {
-                            burnDetails =
-                                "Speed " +
-                                FixedBurnSpeed(burn.actualSpeed);
-                        }
-                        if (!burn.remainingTime.empty()) {
-                            if (!burnDetails.empty()) {
-                                burnDetails += "  |  ";
-                            }
-                            burnDetails +=
-                                "Remaining " +
-                                burn.remainingTime;
-                        }
-                    } else if (state.selectedConsole ==
-                               ConsoleProfile::Dreamcast) {
+                    if (state.selectedConsole ==
+                        ConsoleProfile::Dreamcast) {
                         burnDetails =
                             "Session " +
                             std::to_string(burn.session) +
                             " of 2";
-                        if (!burn.actualSpeed.empty()) {
-                            burnDetails +=
-                                "  |  " +
-                                FixedBurnSpeed(burn.actualSpeed);
-                        }
-                // RB_UNIVERSAL_BURN_METRICS
-                if (burn.ringBufferPercent >= 0) {
-                    if (!burnDetails.empty()) {
-                        burnDetails += "  |  ";
                     }
-                    burnDetails +=
-                        "FIFO / Read Buffer " +
-                        (std::string(
-    burn.ringBufferPercent < 10
-        ? "  "
-        : (burn.ringBufferPercent < 100 ? " " : "")) +
- std::to_string(burn.ringBufferPercent)) +
-                        "%";
-                }
 
-                if (burn.driveBufferPercent >= 0) {
-                    if (!burnDetails.empty()) {
-                        burnDetails += "  |  ";
-                    }
-                    burnDetails +=
-                        "Drive Buffer " +
-                        (std::string(
-    burn.driveBufferPercent < 10
-        ? "  "
-        : (burn.driveBufferPercent < 100 ? " " : "")) +
- std::to_string(burn.driveBufferPercent)) +
-                        "%";
-                } else if (burn.bufferPercent >= 0) {
-                    if (!burnDetails.empty()) {
-                        burnDetails += "  |  ";
-                    }
-                    burnDetails +=
-                        "Buffer " +
-                        (std::string(
-    burn.bufferPercent < 10
-        ? "  "
-        : (burn.bufferPercent < 100 ? " " : "")) +
- std::to_string(burn.bufferPercent)) +
-                        "%";
-                }
-                        if (burn.bufferPercent >= 0) {
-                            burnDetails +=
-                                "  |  buffer " +
-                                (std::string(
-    burn.bufferPercent < 10
-        ? "  "
-        : (burn.bufferPercent < 100 ? " " : "")) +
- std::to_string(burn.bufferPercent)) +
-                                "%";
+                    if (!burn.actualSpeed.empty()) {
+                        if (!burnDetails.empty()) {
+                            burnDetails += "  |  ";
                         }
-                    } else {
-                        burnDetails = FixedBurnSpeed(burn.actualSpeed);
-                        if (burn.bufferPercent >= 0) {
-                            if (!burnDetails.empty()) {
-                                burnDetails += "  |  ";
-                            }
-                            burnDetails +=
-                                "buffer " +
-                                (std::string(
-    burn.bufferPercent < 10
-        ? "  "
-        : (burn.bufferPercent < 100 ? " " : "")) +
- std::to_string(burn.bufferPercent)) +
-                                "%";
+
+                        burnDetails +=
+                            "Speed " +
+                            FixedBurnSpeed(
+                                burn.actualSpeed);
+                    }
+
+                    if (!burn.remainingTime.empty()) {
+                        if (!burnDetails.empty()) {
+                            burnDetails += "  |  ";
                         }
+
+                        burnDetails +=
+                            "Remaining " +
+                            burn.remainingTime;
                     }
                 } else if (
                     burn.stage == BurnStage::Failed) {
@@ -282,7 +296,6 @@ void DrawApp(
                     burnDetails =
                         "Readback verification in progress";
                 }
-
                 const float detailWidth =
                     ImGui::CalcTextSize(burnDetails.c_str()).x;
                 ImGui::SetCursorPosX(

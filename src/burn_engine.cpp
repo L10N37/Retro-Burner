@@ -3141,8 +3141,9 @@ void BurnEngine::RunStandardImage(
         state_.remainingTime.clear();
         state_.actualSpeed.clear();
         state_.progress = 0.0F;
-        state_.status =
-            "Writing " + std::string(BurnTargetName(request.target)) + " disc...";
+        // RB_STAGE44S_WINDOWS_CD_PHASE_BUFFER_PARITY
+        // Match the Linux CD lifecycle from the moment RetroBeam starts.
+        state_.status = "Writing Lead-In...";
     }
 
     AppendLog("\r\nWriting disc\r\n");
@@ -3216,8 +3217,12 @@ void BurnEngine::RunStandardImage(
     static const std::regex progressPattern(
         R"(Track\s+(\d+):\s+([0-9]+(?:\.[0-9]+)?)\s+of\s+([0-9]+(?:\.[0-9]+)?)\s+([kMGT]?B)\s+written)",
         std::regex::icase);
+    static const std::regex fifoPattern(
+        R"(\(fifo\s*([0-9]+)%\))",
+        std::regex::icase);
     static const std::regex bufferPattern(
-        R"(\[buf\s*([0-9]+)%\])");
+        R"(\[buf\s*([0-9]+)%\])",
+        std::regex::icase);
     static const std::regex speedPattern(
         R"(([0-9]+(?:\.[0-9]+)?)x)");
     static const std::regex startSpeedPattern(
@@ -3232,8 +3237,33 @@ void BurnEngine::RunStandardImage(
             const std::string line(lineView);
             std::smatch match;
             float progress = -1.0F;
+            int fifoPercent = -1;
             int bufferPercent = -1;
             std::string speed;
+            std::string backendPhase;
+
+            // Keep Windows visually identical to the Linux RetroBeam
+            // lifecycle. Setup/OPC/pregap are lead-in, track progress is
+            // sector writing, and fixation/session close is finalisation.
+            if (ContainsCaseInsensitive(line, "lead-in") ||
+                ContainsCaseInsensitive(line, "leadin") ||
+                ContainsCaseInsensitive(line, "starting real sao write") ||
+                ContainsCaseInsensitive(line, "waiting for reader process") ||
+                ContainsCaseInsensitive(line, "performing opc") ||
+                ContainsCaseInsensitive(line, "sending cue sheet") ||
+                ContainsCaseInsensitive(line, "writing pregap")) {
+                backendPhase = "Writing Lead-In...";
+            } else if (
+                ContainsCaseInsensitive(line, "starting new track") ||
+                ContainsCaseInsensitive(line, "writing track")) {
+                backendPhase = "Writing Sectors...";
+            } else if (
+                ContainsCaseInsensitive(line, "fixating") ||
+                ContainsCaseInsensitive(line, "closing session") ||
+                ContainsCaseInsensitive(line, "lead-out") ||
+                ContainsCaseInsensitive(line, "leadout")) {
+                backendPhase = "Finalising Disc...";
+            }
 
             if (std::regex_search(
                     line,
@@ -3265,6 +3295,20 @@ void BurnEngine::RunStandardImage(
                             static_cast<double>(totalTracks),
                         0.0,
                         0.999));
+
+                // Progress records are the sector-writing phase even when
+                // RetroBeam no longer repeats "Starting new track".
+                if (backendPhase.empty()) {
+                    backendPhase = "Writing Sectors...";
+                }
+            }
+
+            if (std::regex_search(
+                    line,
+                    match,
+                    fifoPattern)) {
+                fifoPercent =
+                    std::stoi(match[1].str());
             }
 
             if (std::regex_search(
@@ -3288,8 +3332,10 @@ void BurnEngine::RunStandardImage(
             }
 
             if (progress >= 0.0F ||
+                fifoPercent >= 0 ||
                 bufferPercent >= 0 ||
-                !speed.empty()) {
+                !speed.empty() ||
+                !backendPhase.empty()) {
                 std::lock_guard lock(mutex_);
 
                 if (progress >= 0.0F) {
@@ -3297,17 +3343,36 @@ void BurnEngine::RunStandardImage(
                         std::max(
                             state_.progress,
                             progress);
+                }
+
+                if (!backendPhase.empty()) {
                     state_.status =
-                        "Writing " + targetName + " - " +
-                        std::to_string(
-                            static_cast<int>(std::lround(
-                                state_.progress * 100.0F))) +
-                        "%";
+                        std::move(backendPhase);
                 }
+
+                if (fifoPercent >= 0) {
+                    state_.ringBufferPercent =
+                        std::clamp(
+                            fifoPercent,
+                            0,
+                            100);
+                }
+
                 if (bufferPercent >= 0) {
+                    const int clampedBuffer =
+                        std::clamp(
+                            bufferPercent,
+                            0,
+                            100);
+
+                    // bufferPercent remains populated for the compact text
+                    // metric; driveBufferPercent feeds the graphical bar.
                     state_.bufferPercent =
-                        std::clamp(bufferPercent, 0, 100);
+                        clampedBuffer;
+                    state_.driveBufferPercent =
+                        clampedBuffer;
                 }
+
                 if (!speed.empty()) {
                     state_.actualSpeed =
                         std::move(speed);

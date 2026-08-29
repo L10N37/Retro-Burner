@@ -1753,7 +1753,21 @@ int RunGui(
     BurnStage lastCompletionSoundStage =
         BurnStage::Idle;
 
+    // RB_STAGE44AI_LINUX_ACTIVE_BURN_CLOSE_GUARD
+    // Match Windows active-job close protection without blocking
+    // the SDL/ImGui event loop. Multiple SDL close events collapse
+    // into one in-app modal warning.
     bool running = true;
+    bool closeWarningRequested = false;
+
+    const auto requestApplicationClose = [&]() {
+        if (burnEngine.Snapshot().busy) {
+            closeWarningRequested = true;
+            return;
+        }
+
+        running = false;
+    };
     int smokeFrames = 0;
 
     while (running) {
@@ -1766,14 +1780,14 @@ int RunGui(
 
             if (event.type ==
                 SDL_EVENT_QUIT) {
-                running = false;
+                requestApplicationClose();
             } else if (
                 event.type ==
                     SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
                 event.window.windowID ==
                     SDL_GetWindowID(
                         window)) {
-                running = false;
+                requestApplicationClose();
             } else if (
                 event.type ==
                     SDL_EVENT_DROP_FILE &&
@@ -1821,6 +1835,41 @@ int RunGui(
             burnEngine,
             artworks,
             disc);
+
+        // RB_STAGE44AI_LINUX_CLOSE_WARNING_MODAL
+        if (closeWarningRequested) {
+            ImGui::OpenPopup(
+                "Operation in progress##ActiveBurnCloseGuard");
+            closeWarningRequested = false;
+        }
+
+        const ImGuiViewport* closeGuardViewport =
+            ImGui::GetMainViewport();
+
+        ImGui::SetNextWindowPos(
+            closeGuardViewport->GetCenter(),
+            ImGuiCond_Appearing,
+            ImVec2(0.5F, 0.5F));
+
+        if (ImGui::BeginPopupModal(
+                "Operation in progress##ActiveBurnCloseGuard",
+                nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextWrapped(
+                "Retro Burner is still working. Keep the app open "
+                "until the current operation finishes; closing during "
+                "a write can ruin the disc.");
+
+            ImGui::Spacing();
+
+            if (ImGui::Button(
+                    "OK",
+                    ImVec2(120.0F, 0.0F))) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
 
         ImGui::Render();
 

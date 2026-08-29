@@ -324,6 +324,7 @@ echo "  application artwork"
 echo "  static-disc icon"
 echo "  native Linux RetroBeam"
 echo "  native Linux ABGX360"
+echo "  native Linux CDIrip"
 echo
 echo "Host Linux dependencies:"
 echo "  SDL3 / SDL3_image / OpenGL / libc"

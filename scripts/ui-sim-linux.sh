@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXE="$ROOT/dist/linux/RetroBurner"
+EXE="$ROOT/build/linux/app-release/bin/RetroBurner"
 SCENARIO="${1:-all}"
 
 case "$SCENARIO" in

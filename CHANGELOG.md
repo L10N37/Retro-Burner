@@ -4,19 +4,99 @@ All notable project changes are recorded here.
 
 ## [Unreleased]
 
-### Planned after 0.4.0
+### Planned after 0.5.0
 
-- Automatic GitHub Releases update check and new-version pop-up on application start, with a disable option.
-- Sega/Mega-CD and Original Xbox profiles, followed by additional CD-based systems where image/layout requirements are understood and physically tested.
-- CHD input through a properly licensed `chdman`/equivalent conversion path.
-- PS2 ESR patching and FreeDVDBoot preparation using appropriately licensed open-source implementations with complete attribution.
-- Experimental non-MTK BurnerMAX probing/testing.
-- User-selectable 32 KiB / 64 KiB recording-transfer compatibility option with the effective value recorded in the burn log.
-- Linux port; macOS and a 32-bit Windows retro-PC build remain possible follow-ons.
+- Broaden Linux distribution, writer, bridge and media testing.
+- Complete XGD3 end-to-end validation on known-compatible hardware.
+- Complete remaining PS2 DVD9, PS2 CD and Sega Saturn physical regression coverage.
+- Add a GameCube DVD-R profile after image/layout validation; reuse the shared single-layer DVD recording layer rather than creating a console-specific writer.
+- Add Sega/Mega-CD and Original Xbox profiles after format/layout research.
+- Add CHD input through an appropriately licensed conversion path.
+- Add PS2 ESR and FreeDVDBoot preparation from suitable open-source implementations with full attribution.
+- Add an optional GitHub Releases update check.
+- Add an explicit advanced 32 KiB / 64 KiB recording-transfer compatibility control.
+- Consider macOS and 32-bit Windows targets after the Windows/Linux architecture is settled.
 
-## [0.4.0] - release candidate
+## [0.5.0] - 2026-08-30
 
-0.4.0 is a major expansion from the public 0.3.0 release and has not yet been published.
+0.5.0 is the first native Windows + Linux release and a major hardening/quality-of-life update over 0.4.0.
+
+### Linux platform
+
+- Added the native Linux SDL3/OpenGL application.
+- Added Linux SG_IO optical-device transport and native Linux RetroBeam integration.
+- Added Linux-native drive discovery, process runner, verification, BurnerMAX plumbing and texture/audio handling.
+- Added single-file Linux bundling for Retro Burner artwork plus native RetroBeam, CDIrip and ABGX360 helpers.
+- Kept growisofs/dvd+rw-mediainfo as host Linux dependencies for the selectable DVD backend.
+- Added the public `build-linux.sh` build entry point.
+- Added user-local Linux desktop launcher registration with safe handling for repository/build paths containing spaces.
+- Added Linux build support for repository paths containing spaces.
+
+### Windows/Linux UI parity
+
+- Made Windows `DrawApp()` the canonical UI source and added generated Linux UI synchronization/checking.
+- Added parity guards so important burn controls/status text cannot quietly disappear from one platform.
+- Added a hidden no-disc UI simulation matrix covering Dreamcast, PS1, PS2 CD/DVD, Saturn, XGD2/XGD3, RetroBeam/growisofs, verification and failure states.
+- Unified burn progress, phase, speed, remaining time, FIFO/read-buffer and device-buffer presentation.
+- Removed duplicated textual buffer percentages from the compact burn detail row.
+- Fixed Windows DVD phase parsing and Windows successful dummy-result parity.
+- Added active-job close protection to Linux.
+- Reworked Windows close protection to use the same non-blocking in-app warning so the GUI/render loop continues during an active burn.
+
+### Media and write-speed safeguards
+
+- Gated write-speed choices by the actual mounted blank-media MMC profile rather than only by console selection.
+- Prevented incompatible CD/DVD speed descriptors from surviving console/media changes.
+- Added console-specific conservative recommended speed defaults.
+- CD profiles default to the lowest actual speed advertised by the inserted CD-R.
+- PS2 DVD prefers approximately 6x where available; dual-layer/Xbox contexts prefer approximately 4x where available, with conservative fallback.
+- Preserved explicit user speed/Automatic choices after the recommendation is initially applied for a new media/drive/profile context.
+- Added clearer prompts when the selected console profile does not match the inserted blank media.
+
+### PS2 CD safeguards and verification
+
+- Added PS2 CD ISO media-origin probing.
+- Rejects ISO images containing DVD/UDF structures from the PS2 CD profile even when their byte size would fit on CD-R.
+- Added optional full post-burn optical readback comparison for PS2 CD ISO, default OFF.
+- Added the readback progress/status path on Windows and Linux.
+- Added clearer frontend failure categorisation while retaining complete backend output in the Burn Log.
+
+### PlayStation / CDRWIN CUE / RetroBeam
+
+- Added an authoritative no-drive `--rb-cue-check` preflight using the exact RetroBeam CDRWIN CUE parser used for recording.
+- Added a 10-case CUE parser regression suite.
+- Finalised ordinary PlayStation BIN/CUE recording on the parsed CDRWIN DAO/SAO path after rejecting a synthetic RAW96R experiment during 0.5.0 development; that experiment was never part of a public release.
+- Preserved the mixed-mode CUE layout while treating ordinary 2352-byte BIN data as main-channel data rather than synthesizing P-W subchannel content.
+- Added an 8 MiB CD host FIFO.
+- Added whole-disc CD progress telemetry so multi-track jobs do not reset apparent completion at every track.
+- Added real MMC CD dummy/test writes surfaced in the GUI as **DUMMY WRITE CD-R - LASER OFF**.
+- Improved lead-in/start-sector/fixation diagnostics and dummy-write completion reporting.
+- Physically validated the PlayStation DAO/SAO path with a 24-track mixed-mode BIN/CUE: parser regression 10/10, full dummy pass, real CD-R burn and successful boot on physical PlayStation hardware.
+
+### Burn presentation and safety
+
+- Added consistent lifecycle phase text such as Writing Lead-In, Writing Sectors, Finalising Disc and verification.
+- Added clearer failure summaries with full backend output retained in the Burn Log.
+- Kept graphical FIFO/read and device-buffer bars as the authoritative buffer presentation.
+- Added safeguards against closing the application during an active burn on both platforms.
+- Close warnings are non-blocking so the burn/UI continues to run while the warning is visible.
+- Improved successful dummy-write completion state and status text.
+
+### Build and release engineering
+
+- Added `build-windows.ps1` as the native Windows build entry point and removed obsolete Windows batch build wrappers.
+- Added `build-linux.sh` as the native Linux build entry point.
+- Added `docs/BUILDING.md`.
+- Added native RetroBeam CMake support required by Linux.
+- Added Linux embedded-bundle generation.
+- Added cross-platform UI simulation helpers.
+- Fixed the internal Windows RetroBeam build script's repository-root resolution.
+- Fixed Linux and RetroBeam build handling for paths containing spaces.
+- Added release packaging updates for 0.5.0 Windows and Linux assets.
+
+## [0.4.0] - 2026-08-20
+
+0.4.0 was the major expansion from the public 0.3.0 release that generalized the original Dreamcast-focused application into Retro Burner.
 
 ### Application and architecture
 

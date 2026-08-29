@@ -2,57 +2,95 @@
 
 # Retro Burner
 
-Retro Burner is a native Windows optical-disc burning frontend for classic game consoles. The aim is simple: historically, people have needed a collection of different applications, command lines and console-specific guides to burn game discs. **Retro Burner aims to become the one-for-all tool for those workflows** while still exposing enough backend choice and logging to troubleshoot difficult drive/media combinations.
+Retro Burner is a native **Windows and Linux** optical-disc burning frontend for classic game consoles. The goal is to replace a pile of console-specific burning utilities, command lines and old guides with one profile-driven application while keeping enough backend choice, logging and diagnostics to troubleshoot difficult writer/media combinations.
 
-**Current version: 0.4.0**
-
-> Retro Burner 0.4.0 is the current release. Some hardware-specific features are still marked as requiring additional physical validation where applicable.
+**Current version: 0.5.0**
 
 Retro Burner is intended only for images and backups that you are legally entitled to use.
 
+## 0.5.0 at a glance
+
+0.5.0 is a substantial release. Linux is now a first-class native target, and the Windows build also receives a large set of safety, preflight, burn-monitoring and quality-of-life improvements.
+
+Highlights include:
+
+- **Native Linux release** using SDL3, OpenGL and Linux SG_IO optical access.
+- **Windows/Linux UI parity**: Windows `DrawApp()` is the canonical UI and the Linux burn UI is generated/checked from it so the two platforms do not silently drift apart.
+- **Single-file application design on both platforms** for Retro Burner-owned/bundled runtime pieces. Windows ships as one EXE; Linux ships as one native ELF containing the application artwork plus its native RetroBeam, CDIrip and ABGX360 helpers.
+- **Media-aware write-speed selection**: speed choices are gated by the actual mounted blank-media profile instead of just the selected console.
+- **Console-specific conservative speed defaults** while still allowing an explicit user choice or firmware-controlled Automatic mode.
+- **PS2 CD ISO safety gate** that rejects DVD/UDF-origin images accidentally selected under the CD profile.
+- **Optional post-burn readback verification for PS2 CD ISO**, default OFF.
+- **Improved failure presentation** with concise frontend errors while preserving the complete backend log.
+- **Canonical burn presentation** across Windows and Linux: progress, phase, actual speed, remaining time, FIFO/read buffer and device buffer are presented consistently.
+- **Active-burn exit protection** on both platforms. Closing Retro Burner while a job is active is refused with a non-blocking warning so the GUI keeps updating.
+- **Real dummy/test-write support** for CD-R where the writer supports MMC test mode, allowing the complete pipeline to be exercised with the recording laser off.
+- **Authoritative CDRWIN CUE preflight** using the same RetroBeam parser used for recording.
+- **PlayStation BIN/CUE validation**: ordinary PS1 CDRWIN BIN/CUE uses the parsed CDRWIN layout and the physically validated DAO/SAO recording path.
+- **Whole-disc CD progress telemetry** so mixed-mode/multi-track jobs no longer appear to finish when only an early track completes.
+- **8 MiB CD FIFO**, improved lead-in/finalisation status and clearer dummy/start-sector diagnostics.
+- **No-disc UI simulation matrix** for Dreamcast, PS1, PS2 CD/DVD, Saturn, XGD2/XGD3, both DVD backends, verification and failure states.
+- Modern native build entry points: `build-windows.ps1` and `build-linux.sh`.
+- Linux desktop launcher installation with safe handling for repository/build paths containing spaces.
+
+See [`RELEASE_NOTES_0.5.0.md`](RELEASE_NOTES_0.5.0.md) for the detailed release summary.
+
+## Downloads
+
+Release assets are published on the GitHub Releases page.
+
+### Windows x64
+
+The Windows build is a native Win32/Direct3D 11 application and uses Windows SPTI for optical access. The release executable requests administrator rights because direct optical-device access requires them.
+
+The Windows release embeds the runtime helpers used by its supported workflows.
+
+### Linux x86-64
+
+The Linux build is a native SDL3/OpenGL application using Linux SG_IO for optical access.
+
+The Linux executable embeds Retro Burner's artwork plus native RetroBeam, CDIrip and ABGX360 helper binaries. The selectable DVD `growisofs` path and `dvd+rw-mediainfo` remain **host Linux dependencies** rather than being embedded.
+
+The 0.5.0 Linux asset is a normal native ELF, not an AppImage/Flatpak. A compatible SDL3, SDL3_image, OpenGL and libc environment is required.
+
 ## Supported console profiles
 
-| Console | Image format | Recording path | 0.4.0 status |
+| Console | Image format | Recording path | 0.5.0 status |
 | --- | --- | --- | --- |
-| Dreamcast | CDI | CDIrip + RetroBeam | Physically tested |
-| PlayStation | BIN/CUE | RetroBeam CUE/SAO | Physically tested |
-| PlayStation 2 CD | BIN/CUE or ISO | RetroBeam | Implemented; final regression test pending |
-| PlayStation 2 DVD | ISO, DVD5/DVD9 | RetroBeam or growisofs + dvd+rw-mediainfo | DVD5 physically tested; DVD9 implemented but not physically validated |
-| Sega Saturn | BIN/CUE | RetroBeam CUE/SAO | Implemented; final regression test pending |
-| Xbox 360 XGD2 | ISO to DVD+R DL | RetroBeam or growisofs | Implemented; physical validation pending |
-| Xbox 360 XGD3 | ISO to DVD+R DL | image verification/preparation + BurnerMAX path + selected DVD backend | **Experimental; end-to-end burn currently untested** |
+| Dreamcast | CDI | CDIrip + RetroBeam | Physically tested workflow |
+| PlayStation | BIN/CUE | RetroBeam CDRWIN CUE + DAO/SAO | **0.5.0 DAO path physically validated** |
+| PlayStation 2 CD | BIN/CUE or ISO | RetroBeam | Implemented; ISO media-type guard and optional ISO readback verification added |
+| PlayStation 2 DVD | ISO, DVD5/DVD9 | RetroBeam or growisofs | DVD5 physically tested; DVD9 implemented but not physically validated |
+| Sega Saturn | BIN/CUE | RetroBeam CDRWIN CUE + DAO/SAO | Implemented; broader physical regression coverage still welcome |
+| Xbox 360 XGD2 | ISO to DVD+R DL | RetroBeam or growisofs | Implemented; physical validation still limited |
+| Xbox 360 XGD3 | ISO to DVD+R DL | image preparation/verification + BurnerMAX path + selected DVD backend | **Experimental; end-to-end validation still incomplete** |
 
-If there is a legitimate optical-disc workflow Retro Burner does not cover, feature requests are welcome.
+Hardware/media validation is necessarily narrower than the number of implemented code paths. Optical recording depends on writer firmware, media MID/batch, USB/SATA bridge, selected speed and the target console's optical pickup.
 
-## Highlights
+## Recording backends
 
-- Native C++20 Windows application using Dear ImGui and DirectX 11.
-- One console/profile selector instead of separate burning applications.
-- Automatic optical writer, firmware and inserted-media detection.
-- Real write-speed choices reported by the drive/media where available.
-- Read-only media preflight before writing.
-- **Live graphical burn monitoring** with overall progress, actual write speed, remaining time, host/read-buffer and optical drive-buffer bars.
-- Automatic eject and completion sound after a successful burn.
-- Capability-driven Advanced Settings for BURN-Free, Force Speed, OPC, MMC streaming/rotation policy and drive-buffer reporting.
-- RetroBeam as the default recording backend, with **growisofs retained as an optional DVD backend** for PS2 DVD and Xbox 360 workflows.
-- Backend-aware monitoring keeps the UI consistent: RetroBeam supplies its FIFO/read and drive-buffer data, while growisofs `RBU`/`UBU` output is parsed into the same graphical **Buffer** and **Device Buffer** bars.
-- Single-EXE release design, subject to the licence terms of each bundled helper.
+### RetroBeam
 
-## Recording backends: choice, not a universal ranking
+RetroBeam is Retro Burner's default recording backend. It is built from the pinned SchilyTools/cdrecord/libscg source baseline with Retro Burner integration for:
 
-RetroBeam is the default because it gives Retro Burner direct control over the recording path and detailed SPTI/buffer diagnostics. growisofs remains selectable for supported DVD profiles so users can compare behaviour on their own hardware.
+- Windows SPTI transport.
+- Linux SG_IO transport.
+- host/read FIFO telemetry.
+- optical drive-buffer telemetry.
+- CDRWIN CUE parsing/preflight.
+- CD DAO/SAO and test-write handling.
+- DVD recording paths.
+- whole-disc progress and frontend-oriented diagnostics.
 
-The two backends report progress differently internally, but Retro Burner presents them through a consistent burn UI. RetroBeam's FIFO/read-buffer and drive-buffer reporting drives the graphical **Buffer** and **Device Buffer** bars. For growisofs, Retro Burner parses its `RBU` and `UBU` values into those same bars, along with live percentage, actual write speed and estimated remaining time. growisofs phase output is also translated into cleaner status messages such as **Writing Lead-In**, **Writing Sectors** and **Finalising Disc**.
+RetroBeam remains conservative about BURN-Free: underrun recovery is opt-in and capability-gated rather than silently forced on.
 
-A result on one development system is **not** a universal statement that one backend is better than another. Optical recording depends on several variables at once, including:
+### growisofs
 
-- burner model and firmware
-- USB/SATA bridge and connection quality
-- recordable-media brand, MID and batch quality
-- selected write speed and drive write strategy
-- console model and the condition/calibration of its optical pickup
+`growisofs` remains an optional DVD backend for supported PS2 DVD and Xbox 360 workflows.
 
-That is why Retro Burner presents the backend as a user choice rather than pretending one test machine can determine the best engine for everyone.
+Retro Burner parses growisofs percentage/speed plus `RBU`/`UBU` telemetry into the same user-facing progress/buffer presentation used for RetroBeam.
+
+Backend choice is a compatibility option, not a claim that one engine is universally better.
 
 ## Console workflows
 
@@ -60,174 +98,188 @@ That is why Retro Burner presents the backend as a user choice rather than prete
 
 Dreamcast DiscJuggler images are extracted with CDIrip and recorded with RetroBeam. The tested self-boot Data+Data and Audio+Data workflows are retained.
 
-Retro Burner asks CDIrip for the required conversion without using CDIrip's `-cdrecord` preset, because that preset also enables track cutting that can damage audio tracks.
+Retro Burner requests the required CDIrip conversion without enabling CDIrip's `-cdrecord` preset, because that preset also enables track cutting that can damage audio tracks.
 
-### PlayStation, PlayStation 2 CD and Sega Saturn
+### PlayStation BIN/CUE
 
-BIN/CUE images use RetroBeam's CUE/SAO path. PlayStation BIN/CUE burning has been physically tested. PS2 CD and Sega Saturn profiles are implemented and need final 0.4.0 regression testing on physical hardware/media.
+0.5.0 tightens the PS1 path substantially.
+
+The exact RetroBeam CDRWIN CUE parser can now be run as a no-drive preflight before the GUI accepts the image. Ordinary BIN/CUE recording preserves the parsed mixed-mode layout and records in DAO/SAO mode.
+
+Ordinary 2352-byte BIN/CUE sets are treated as main-channel data described by the CUE. True subchannel-aware support remains a separate future path for image formats that genuinely provide or require that material.
+
+The DAO/SAO path was validated with a 24-track mixed-mode PlayStation BIN/CUE: parser regression tests passed, a complete MMC dummy write/fixation pass completed, a real CD-R was burned and the disc booted on physical PlayStation hardware.
+
+### PlayStation 2 CD
+
+PS2 CD supports BIN/CUE and ISO input.
+
+For ISO input, 0.5.0 adds a media-origin sanity check. An ISO that contains DVD/UDF structures is rejected from the CD profile even if its byte size would fit on CD-R, preventing a common wrong-profile mistake.
+
+PS2 CD ISO also offers optional full readback comparison after a successful burn. Verification is off by default because it adds a complete second optical read pass.
 
 ### PlayStation 2 DVD
 
 PS2 DVD ISO images can be recorded with RetroBeam or the optional growisofs backend. `dvd+rw-mediainfo` is used for read-only media/capacity interrogation.
 
-- DVD5 recording has been physically tested on a real PlayStation 2.
-- DVD9 handling and layer-break calculation are implemented but still require a physical release-validation burn.
-- Backend choice is preserved specifically because different drive/media combinations may behave differently.
+DVD5 has been physically tested. DVD9 handling and layer-break calculation are implemented, but broad physical validation remains incomplete.
 
-### Xbox 360 XGD2
+### Sega Saturn
 
-XGD2 uses DVD+R DL and the standard layer break:
+Saturn BIN/CUE uses the same authoritative CDRWIN CUE/DAO architecture as the other mixed-mode CD profiles. More physical writer/media/console reports are still useful.
+
+### Xbox 360 XGD2 / XGD3
+
+XGD2 uses DVD+R DL with layer break:
 
 ```text
 1913760
 ```
 
-The workflow is implemented but should remain marked as physically unverified until a release-validation disc is completed.
-
-### Xbox 360 XGD3 — experimental
-
-XGD3 requires a correctly prepared image plus enough writable DVD+R DL capacity. Retro Burner's development workflow performs image preparation/verification, blank-media checks, BurnerMAX-capacity checks and then records with the selected compatible DVD backend using layer break:
+XGD3 uses layer break:
 
 ```text
 2133520
 ```
 
-The original source ISO is never modified; any preparation is performed on a temporary working copy.
+XGD3 also requires a correctly prepared image and enough writable DVD+R DL capacity. Retro Burner performs image preparation/verification on a temporary working copy and never modifies the user's source ISO.
 
-**Important 0.4.0 test status:** during development, the HL-DT-ST GP60NB50/PE00 test drive successfully accepted the BurnerMAX payload and exposed the expanded-capacity state, but the subsequent XGD3 recording did not proceed. The drive was later rendered unusable during separate manual firmware experimentation while investigating compatibility. That firmware incident was **not caused by a Retro Burner disc write**, but it removed the only available test drive before a complete XGD3 disc could be validated.
+The native BurnerMAX interoperability path remains experimental. A compatible-capacity state has been reached during development, but XGD3 should still be treated as an experimental workflow until repeatable complete burns and console verification are available.
 
-As a result, **XGD3 titles remain end-to-end untested in Retro Burner**. Compatible burners are on the way for continued validation, including Lite-On iHAS hardware and cross-flash-compatible drives intended to use permanent C4EVA firmware. XGD3 should remain labelled experimental until those real burns are completed and verified on console.
+## Write-speed behaviour
 
-### Native BurnerMAX status
+0.5.0 no longer shows a console-derived speed list when the inserted media is from the wrong family. The mounted MMC media profile is authoritative.
 
-Retro Burner contains a native interoperability module based on the publicly documented/researched BurnerMAX command behaviour; the original C4E `BurnerMax.exe` is not bundled or executed.
+When a new compatible media/drive/profile context is detected, Retro Burner chooses a conservative recommendation:
 
-Current development observations:
+- CD-based profiles: lowest actual speed advertised by the inserted CD-R.
+- PS2 DVD: prefers approximately 6x where the media/drive advertises it, otherwise falls back conservatively.
+- dual-layer/Xbox 360 contexts: prefers approximately 4x where advertised, otherwise falls back conservatively.
 
-- **HL-DT-ST GP60NB50 / PE00 / USB:** payload stage and expanded-capacity state were reached; **no completed XGD3 burn was obtained before the drive was lost during separate firmware experimentation**.
-- **ASUS SDRW-08U9M-U / B201 / USB:** the current MediaTek-style path is safely rejected. Experimental non-MTK/vendor-specific BurnerMAX investigation is planned and can be tested on this drive without advertising it as supported beforehand.
+The recommendation is applied when the media/drive/profile context changes. It does **not** continuously overwrite a later explicit user choice.
 
-A model appearing here is never treated as a permanent whitelist. Live capability/capacity checks remain mandatory.
+## Burn monitoring and safety
 
-## Drive and media compatibility
+During an active write Retro Burner can show:
 
-One useful development result came from an ASUS SDRW-08U9M-U B201 with Sony AccuCORE `SONY16D1` DVD-R media. The same workload failed late in the disc with RetroBeam, growisofs and ImgBurn, around the same physical region. That is exactly why Retro Burner does not present a backend test as a universal verdict.
+- overall whole-disc progress.
+- current phase such as **Writing Lead-In**, **Writing Sectors**, **Finalising Disc** or verification.
+- actual write speed.
+- estimated remaining time where available.
+- host FIFO/read-buffer health.
+- optical device-buffer health.
+- full backend log.
 
-If a burn repeatedly fails, test another media brand/MID, another write speed and—where available—another backend or writer before concluding that the image is bad.
+The compact burn detail row and the graphical buffer bars have separate roles; buffer percentages are not duplicated into profile-specific text.
 
-### Burn a coaster? Please report it
+Windows and Linux also refuse an application-close request while `BurnEngine` is busy. The warning is rendered non-blockingly so the active burn and GUI continue to progress.
 
-A failed disc is useful data if the hardware/media details and log are preserved. Use the **Burn / coaster report** issue template and include:
+## Dummy/test write
 
-- Retro Burner version or commit
-- console/profile and image format
-- selected recording backend
-- exact writer model, firmware and connection type
-- blank-media type, brand and MID if available
-- selected speed/settings
-- console model and optical-drive/laser notes where relevant
-- failure percentage/stage and final error
-- complete Retro Burner burn log
-- whether the same image/media behaved differently with another backend or application
+For compatible CD-R writers, **DUMMY WRITE CD-R - LASER OFF** runs the real RetroBeam CD recording pipeline in MMC test mode.
 
-This helps separate software bugs from burner, firmware, media and console-laser compatibility problems.
+It exercises track setup, lead-in, sector streaming and finalisation without intentionally recording the disc. Drive support for test mode/fixation behaviour still varies by firmware.
 
-## Single-EXE architecture
+## Linux notes
 
-The 0.4.0 release design embeds the helper programs required by each workflow and extracts them to a private process-specific temporary directory while Retro Burner runs.
+The public Linux build is new in 0.5.0. It uses:
 
-Current helpers include or are intended to include:
+- SDL3 + OpenGL 3 for the GUI.
+- Linux SG_IO for native optical commands.
+- the same RetroBeam source baseline as Windows.
+- generated UI parity from the canonical Windows `DrawApp()`.
+- a single-file release binary for Retro Burner-owned/bundled assets/helpers.
+- host `growisofs` and `dvd+rw-mediainfo` for the optional DVD backend.
 
-- CDIrip
-- RetroBeam
-- growisofs
-- dvd+rw-mediainfo
-- ABGX360 Xbox 360 image verification/preparation helper
-
-Embedding a helper never changes its licence. `THIRD_PARTY.md`, `licenses/` and the corresponding source/provenance must match exactly what is shipped.
-
-## Planned updates
-
-The following are **planned**, not claims about 0.4.0 functionality:
-
-- **Original Xbox** disc workflow (retail Xbox games are DVD-based, not CD-based).
-- **Sega/Mega-CD** profile and physical testing.
-- **CHD input** for CD-based systems, using `chdman` or an equivalent properly licensed conversion path to extract a temporary BIN/CUE set before recording.
-- **PS2 ESR patching** sourced from suitable open-source implementations, with provenance, licence and credits documented before integration.
-- **PS2 FreeDVDBoot preparation option**, likewise sourced only from appropriately licensed/open-source work with full attribution.
-- **Experimental BurnerMAX on non-MTK chipsets**, beginning with safe probing/testing on the ASUS development drive. It stays experimental unless repeatable real burns prove it useful.
-- **Automatic update check on application start**, with a small new-version pop-up linked to the GitHub Releases page and a user setting to disable the check.
-- **Adjustable 32 KiB / 64 KiB recording transfer size** for controlled compatibility testing. growisofs uses a 32 KiB DVD write chunk in the vendored source; RetroBeam's native Windows SPTI path supports larger transfers, and the option should be documented as an advanced compatibility control rather than a guaranteed quality switch.
-- **Linux build** as the first non-Windows target.
-- **Possible macOS build** after the cross-platform backend/UI work is proven on Linux.
-- **Possible 32-bit Windows “retro PC” build** if the dependency and toolchain footprint can be kept practical.
-
-### Other CD-based systems worth considering
-
-After Sega/Mega-CD, the existing BIN/CUE/SAO work could potentially be extended to other optical systems such as:
-
-- Neo Geo CD
-- PC Engine CD / TurboGrafx-CD
-- 3DO
-- NEC PC-FX
-- Amiga CD32 / CDTV
-- Philips CD-i
-- Atari Jaguar CD
-- FM Towns Marty
-
-These should be added only after image-layout requirements and real-hardware validation are understood; a generic “it is a CD” assumption is not enough.
+A normal `./build-linux.sh Release` build also installs/refreshes a user-local desktop launcher. Use `--no-desktop` when building a test/release copy without changing the desktop entry.
 
 ## Building from source
 
-### Requirements
+Detailed instructions are in [`docs/BUILDING.md`](docs/BUILDING.md).
 
-- Windows 10 or Windows 11
-- Visual Studio 2022 with Desktop development with C++
-- CMake 3.24 or newer
-- PowerShell
-- Git
-- MSYS2/MinGW for the native RetroBeam helper and applicable third-party helper rebuilds
-
-Build Release:
+Windows Release:
 
 ```powershell
-.\build-release.bat
+.\build-windows.ps1 -Configuration Release
 ```
 
-Prepare a release package:
+Linux Release:
+
+```bash
+./build-linux.sh Release
+```
+
+Windows release package:
 
 ```powershell
 .\package-release.bat
 ```
 
-The 0.4.0 build system uses portable project-relative paths and Retro Burner naming throughout the active build and packaging workflow.
+Linux release package:
+
+```bash
+./package-release-linux.sh
+```
 
 ## Project layout
 
 ```text
-RetroBurner/
+Retro-Burner/
 |-- .github/ISSUE_TEMPLATE/          report/request templates
 |-- Images/                          README/release screenshots
-|-- assets/                          embedded console art and sound
-|-- cmake/                           RetroBeam bridge/build integration
-|-- src/                             Retro Burner C++ source
-|-- external/                        corresponding third-party source snapshots
+|-- assets/                          embedded console art, icon and sound
+|-- cmake/                           RetroBeam and platform build integration
+|-- docs/                            build/developer documentation
+|-- external/                        third-party source snapshots
 |-- licenses/                        third-party licence texts/notices
-|-- scripts/                         build/bootstrap/release helpers
+|-- scripts/                         build, release, test and UI-parity helpers
+|-- src/                             Retro Burner C++ source
 |-- CMakeLists.txt
 |-- README.md
+|-- RELEASE_NOTES_0.5.0.md
 |-- THIRD_PARTY.md
 |-- CHANGELOG.md
 `-- LICENSE
 ```
 
+## Planned work
+
+The next development line can focus on:
+
+- broader Linux drive/media testing and portability.
+- completed XGD3 validation on known-compatible hardware.
+- PS2 DVD9, PS2 CD and Saturn physical regression coverage.
+- GameCube DVD-R workflow after image/profile validation, including 8 cm mini DVD-R and the historically used 12 cm DVD-R option for consoles with suitable full-size-disc shell clearance.
+- Sega/Mega-CD and Original Xbox workflows.
+- CHD input through an appropriately licensed conversion path.
+- PS2 ESR and FreeDVDBoot preparation from suitable open-source implementations.
+- optional application update checking.
+- an explicit advanced 32 KiB / 64 KiB transfer compatibility control.
+- possible macOS and 32-bit Windows targets after the Windows/Linux architecture is settled.
+
+See [`ROADMAP.md`](ROADMAP.md).
+
+## Drive/media reports
+
+A failed disc can be useful data if the hardware/media details and complete log are preserved. Use the **Burn / coaster report** issue template and include:
+
+- Retro Burner version/commit and operating system.
+- console/profile and image format.
+- selected recording backend.
+- writer model, firmware and connection type.
+- blank-media type, brand and MID if available.
+- selected speed/settings.
+- failure percentage/stage and final error.
+- complete Retro Burner burn log.
+- whether the same image/media behaved differently with another backend/application.
+
 ## Licensing
 
 Original Retro Burner source code is released under the **MIT License**. That grant applies only to original Retro Burner code and does not relicense third-party source, helper executables, artwork or sounds.
 
-For redistributed third-party components, the release must include the applicable upstream licence/permission basis, required copyright/licence notices, corresponding source where required, and clear attribution in `THIRD_PARTY.md`.
+For redistributed third-party components, the release must retain the applicable upstream licences/notices and corresponding source/provenance as required.
 
-See `THIRD_PARTY.md` and `licenses/` for the release inventory.
+See [`THIRD_PARTY.md`](THIRD_PARTY.md) and `licenses/`.
 
 ## Credits
 
@@ -236,13 +288,13 @@ Retro Burner stands on a large amount of prior open-source and optical-disc work
 - **Omar Cornut and Dear ImGui contributors** — Dear ImGui.
 - **DeXT / Lawrence Williams and CDIrip contributors/maintainers** — DiscJuggler CDI extraction.
 - **Jörg Schilling and SchilyTools/cdrtools contributors** — cdrecord, libscg and related optical-recording foundations used by RetroBeam.
-- **Andy Polyakov and dvd+rw-tools contributors**, plus the Windows-port contributors whose source is vendored in this repository — DVD media interrogation and growisofs.
-- **Seacrest, Hadzz, BakasuraRCE and later ABGX360 community contributors** — Xbox 360 image verification/preparation software and continued community maintenance.
-- **C4EVA, Team Jungle and Team Xecuter researchers/developers** — historical BurnerMAX work and documentation/research that made interoperability possible. Retro Burner does not distribute the original BurnerMax executable.
+- **Andy Polyakov and dvd+rw-tools contributors** — DVD media interrogation and growisofs.
+- **Seacrest, Hadzz, BakasuraRCE and later ABGX360 community contributors** — Xbox 360 image verification/preparation.
+- **C4EVA, Team Jungle and Team Xecuter researchers/developers** — historical BurnerMAX work and research. Retro Burner does not distribute the original BurnerMax executable.
 - **Mixkit** — current completion sound asset, subject to the retained asset notice/licence terms.
-- Everyone testing burns, reporting failed media combinations, requesting console profiles and documenting old optical hardware.
+- Everyone testing burns, reporting failed media combinations and documenting old optical hardware.
 
-Third-party names are credits/provenance only and do not imply endorsement of Retro Burner.
+Third-party names are credits/provenance only and do not imply endorsement.
 
 ## Disclaimer
 
@@ -250,30 +302,4 @@ Retro Burner is an independent community project. It is not affiliated with, end
 
 Console names and trademarks belong to their respective owners. No BIOS files, console firmware, game data or copyrighted game images are included.
 
-Use Retro Burner only with software and disc images that you have the legal right to use. Online-service policies and local law remain the user's responsibility.
-
-## Engineering notes
-
-### Continuous-write quality policy
-
-Retro Burner prioritizes an uninterrupted recording pass for console media.
-
-- BURN-Free remains disabled by default and is opt-in only when the drive advertises support.
-- RetroBeam exposes host/read and drive-buffer health in the burn UI.
-- Force Speed and MMC streaming controls are capability-gated rather than model-whitelisted.
-- DVD layer-break and OPC policy are constructed by Retro Burner and passed to the selected recording backend.
-- Recording transfer size is currently backend/profile dependent; an explicit 32 KiB / 64 KiB compatibility control is planned rather than claiming one value is universally superior.
-
-DVD behaviour remains media-, drive-, firmware-, bridge- and MMC-profile-dependent.
-
-### RetroBeam source baseline
-
-Retro Burner vendors the pinned SchilyTools source tag `2021-09-18` (commit `90e8f68220698ce0dc132a9f7e7e25f0b9382f64`), containing cdrecord 3.02a10. RetroBeam retains the applicable upstream copyright/licence headers while carrying the Windows integration work in this repository.
-
-### Native Windows host FIFO
-
-The pinned Schily cdrecord FIFO is a producer/consumer ring buffer based on shared memory plus `fork()`. Native MinGW does not provide POSIX `fork()`, so Retro Burner's Windows adaptation uses `VirtualAlloc()` and a CRT-aware `_beginthreadex()` reader thread. The original POSIX FIFO path remains separate from the native Windows implementation.
-
-### Native Windows SPTI transfer work
-
-Retro Beam's Windows libscg/SPTI work includes expanded transfer capability and tracing/diagnostic support. For DVD-R compatibility testing, the current development tree also contains a 32 KiB write cap for the relevant sequential DVD path. 0.4.x should expose the 32/64 KiB choice only after the behaviour is made explicit in the UI and logs.
+Use Retro Burner only with software and disc images that you have the legal right to use.

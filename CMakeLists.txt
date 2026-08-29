@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(RetroBurner VERSION 0.4.0 LANGUAGES C CXX)
+project(RetroBurner VERSION 0.5.0 LANGUAGES C CXX)
 
 # The Windows resource compiler is only required for the native Win32 GUI.
 # Keeping RC out of the project language list lets the same top-level CMake
@@ -328,6 +328,16 @@ set_target_properties(cdirip PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CDIRIP_EMBED_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CDIRIP_EMBED_DIR}"
 )
+set(RETROBURNER_VERSION_RC
+    "${CMAKE_CURRENT_BINARY_DIR}/RetroBurnerVersion.rc"
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/RetroBurnerVersion.rc.in"
+    "${RETROBURNER_VERSION_RC}"
+    @ONLY
+)
+
 add_executable(RetroBurner WIN32
     src/main.cpp
     src/burn_engine.cpp
@@ -342,6 +352,7 @@ add_executable(RetroBurner WIN32
     src/texture_loader.h
     src/resource.h
     src/RetroBurner.rc
+    "${RETROBURNER_VERSION_RC}"
 )
 
 

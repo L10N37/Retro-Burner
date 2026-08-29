@@ -1,15 +1,18 @@
-# RetroBurner Optical Engine - Modern Build
+# RetroBeam Optical Engine - Modern Build
 
-This directory is owned by RetroBurner.
+This directory is Retro Burner's owned CMake/integration layer for the pinned SchilyTools/cdrtools recording source.
 
-Milestone A:
-- CMake compiles the current cdrecord source set directly.
-- Schilling RULES, SMakefile, smake, configure and makedepend are not invoked.
-- Existing proven i686 support archives are temporarily linked as a bridge.
+The upstream cdrtools authorship/licence remains preserved. Retro Burner owns the modern build glue, platform adaptation and frontend integration in this directory.
 
-Milestone B:
-- Build libscg, libscgcmd, librscg, libschily, libdeflt, libcdrdeflt and libedc_ecc with CMake.
-- Replace the generated Schilling xconfig/rules dependency with RetroBurner feature checks.
-- Add native Linux and macOS transport targets.
+## Current 0.5.0 state
 
-The cdrtools authorship/license remains preserved; RetroBurner owns this build and integration layer.
+The bridge builds the RetroBeam-linked source set natively for both supported desktop targets:
+
+- **Windows:** native RetroBeam helper with Windows SPTI/libscg transport integration.
+- **Linux:** native RetroBeam helper with Linux SG_IO/libscg transport.
+
+The required `cdrecord`, `libscg`, `libscgcmd`, `librscg`, `libschily`, `libdeflt`, `libcdrdeflt` and `libedc` pieces are built directly through CMake rather than invoking the historical Schily RULES/SMakefile build system.
+
+Retro Burner integration includes platform feature/config generation, native transport selection, CDRWIN CUE preflight, frontend progress/buffer telemetry, the Windows native host-FIFO adaptation and Linux path-with-spaces build support.
+
+The pinned recording source baseline and original upstream copyright/licence headers remain preserved.

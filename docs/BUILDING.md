@@ -2,100 +2,184 @@
 
 Retro Burner is one source repository with two native desktop targets.
 
-## Public build entry points
+## Windows x64
 
-These are the only build commands users/developers should need:
+Requirements:
 
-### Windows
+- Windows 10/11.
+- Visual Studio 2022 with Desktop development with C++.
+- CMake 3.24+.
+- PowerShell.
+- Git.
+- MSYS2/MinGW as required by native RetroBeam/helper build steps.
+
+Release build:
 
 ```powershell
 .\build-windows.ps1 -Configuration Release
 ```
 
-Optional clean build:
+Clean Release build:
 
 ```powershell
 .\build-windows.ps1 -Configuration Release -Clean
 ```
 
-The Windows build is native Windows:
+Windows is native MSVC/Win32/Direct3D 11 with Windows SPTI optical access. Runtime helpers/assets are embedded into the finished EXE.
 
-- MSVC x64 application
-- Win32 window/platform layer
-- Direct3D 11 renderer
-- Windows SPTI optical transport
-- native Windows RetroBeam backend built/staged before the GUI
+Output:
 
-### Linux
+```text
+build/msvc-x64/Release/RetroBurner.exe
+```
+
+## Linux x86-64
+
+Generic requirements include:
+
+- CMake 3.24+ and Ninja.
+- GCC or Clang with C++20.
+- SDL3 and SDL3_image development files.
+- OpenGL development files.
+- Python 3.
+- Git, make, autoconf/automake.
+- libcurl and zlib development files.
+- `growisofs` and `dvd+rw-mediainfo` for the selectable DVD backend.
+
+Release build:
 
 ```bash
 ./build-linux.sh Release
 ```
 
-Optional clean build:
+Clean Release build:
 
 ```bash
 ./build-linux.sh Release --clean
 ```
 
-The Linux build is native Linux:
+Build without installing/refreshing the desktop launcher:
 
-- GCC/Clang x86-64 application
-- SDL3 window/platform layer
-- OpenGL 3 renderer
-- Linux SG_IO optical transport
-- native Linux RetroBeam backend built from the same repository source
-- SDL3_image for the repository artwork
-- dvd+rw-tools/growisofs for the selectable DVD backend
+```bash
+./build-linux.sh Release --clean --no-desktop
+```
 
-## Source layout
+The Linux build creates native CDIrip, RetroBeam and pinned ABGX360 helpers, embeds them plus the application assets into the final Retro Burner ELF, then removes development sidecars from the release `bin` directory.
 
-Shared interfaces and application concepts remain in one repository.
+Output:
 
-### Shared
+```text
+build/linux/app-release/bin/RetroBurner
+```
 
-- `src/burn_engine.h`
-- `src/drive_manager.h`
-- repository assets
-- Dear ImGui
-- RetroBeam/cdrtools source under `external/schilytools`
-- RetroBeam CMake ownership under `cmake/retroburner-optical`
+The final release `bin` directory is intentionally single-file.
 
-### Windows-native implementation
+A normal build also installs/refreshes:
 
-- `src/main.cpp`
-- `src/burn_engine.cpp`
-- `src/drive_manager.cpp`
-- `src/texture_loader.cpp`
-- `src/embedded_tools.cpp`
-- Win32 / D3D11 ImGui backends
+```text
+~/.local/bin/retroburner-current
+~/.local/share/applications/io.github.L10N37.RetroBurner.desktop
+```
 
-### Linux-native implementation
+The wrapper keeps the desktop entry safe even when the repository path contains spaces.
 
-- `src/main_linux.cpp`
-- `src/burn_engine_linux.cpp`
-- `src/drive_manager_linux.cpp`
-- `src/texture_loader_linux.cpp`
-- `src/process_runner_linux.cpp`
-- `src/retrobeam_linux.cpp`
-- `src/optical_verify_linux.cpp`
-- SDL3 / OpenGL3 ImGui backends
+## UI simulation / parity testing
 
-The platform implementations must stay behind the same shared contracts where practical. A feature change should be implemented in the shared model/API first, then connected to each native platform implementation as required.
-
-## Build output
+These modes synthesize burn/drive state. They do not start an optical backend or issue a disc WRITE command.
 
 Windows:
 
-```text
-build/msvc-x64/<Configuration>/RetroBurner.exe
+```powershell
+.\scripts\ui-sim-windows.ps1 -Scenario all
 ```
 
 Linux:
 
-```text
-build/linux/app-<configuration>/bin/RetroBurner
-build/linux/app-<configuration>/bin/retrobeam
+```bash
+./scripts/ui-sim-linux.sh all
 ```
 
-Stage/test build directories used during the Linux bring-up are development artifacts only. They are not part of the final build procedure.
+Scenarios:
+
+```text
+dreamcast
+ps1
+ps2cd
+ps2cd-verify
+ps2dvd-retrobeam
+ps2dvd-growisofs
+saturn
+xgd2-retrobeam
+xgd2-growisofs
+xgd3-retrobeam
+xgd3-growisofs
+ps2cd-failure
+```
+
+## CUE parser regression
+
+```bash
+python3 scripts/test-retrobeam-cuecheck.py <path-to-retrobeam>
+```
+
+This uses the same CDRWIN CUE parser as recording without opening a writer.
+
+## Release packages
+
+Windows:
+
+```powershell
+.\package-release.bat
+```
+
+Produces:
+
+```text
+dist/RetroBurner-0.5.0-windows-x64.zip
+dist/RetroBurner-0.5.0-windows-x64.zip.sha256
+```
+
+Linux:
+
+```bash
+./package-release-linux.sh
+```
+
+Produces:
+
+```text
+dist/RetroBurner-0.5.0-linux-x86_64.tar.gz
+dist/RetroBurner-0.5.0-linux-x86_64.tar.gz.sha256
+```
+
+Each archive contains the application plus README/release/licence documentation.
+
+## Shared architecture
+
+Shared interfaces/concepts include:
+
+- `src/burn_engine.h`
+- `src/drive_manager.h`
+- `src/ui_burn_simulation.h`
+- `src/ps2_media_probe.h`
+- `src/retrobeam_failure.h`
+- `src/retrobeam_progress.*`
+- Dear ImGui
+- RetroBeam/cdrtools source under `external/schilytools`
+- RetroBeam CMake integration under `cmake/retroburner-optical`
+
+Windows-native implementation includes `src/main.cpp`, `src/burn_engine.cpp`, `src/drive_manager.cpp`, `src/texture_loader.cpp`, `src/embedded_tools.cpp` and Win32/D3D11 ImGui backends.
+
+Linux-native implementation includes `src/main_linux.cpp`, `src/burn_engine_linux.cpp`, `src/drive_manager_linux.cpp`, `src/texture_loader_linux.cpp`, `src/process_runner_linux.cpp`, `src/retrobeam_linux.cpp`, `src/optical_verify_linux.cpp` and SDL3/OpenGL ImGui backends.
+
+## UI source-of-truth rule
+
+`src/main.cpp :: DrawApp()` is canonical.
+
+`scripts/internal/sync-linux-ui.py` generates:
+
+```text
+src/draw_app_linux.generated.inl
+```
+
+with only required native platform substitutions. `build-linux.sh` runs the synchronization before compiling. Do not hand-edit the generated Linux DrawApp include.

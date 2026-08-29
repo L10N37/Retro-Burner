@@ -1938,7 +1938,7 @@ write_leadin_mmc(scgp, dp, trackp)
 			startsec = dp->cdr_dstat->ds_first_leadin;
 			printf("SAO startsec: %ld\n", startsec);
 		} else if (startsec <= 0 && startsec != -150) {
-			errmsgno(EX_BAD, "WARNING: Drive returns wrong startsec (%ld) using -150\n",
+			errmsgno(EX_BAD, "NOTICE: Writer start position differs from required layout (%ld) using -150\n",
 					startsec);
 			startsec = -150;
 		}
@@ -1977,7 +1977,7 @@ write_leadin_mmc(scgp, dp, trackp)
 			/*
 			 * There must be at least 1 minute lead-in.
 			 */
-			errmsgno(EX_BAD, "WARNING: Drive returns wrong startsec (%ld) using %ld from ATIP\n",
+			errmsgno(EX_BAD, "NOTICE: Writer start position differs from required layout (%ld) using %ld from ATIP\n",
 					startsec, (long)dp->cdr_dstat->ds_first_leadin);
 			startsec = dp->cdr_dstat->ds_first_leadin;
 		}
@@ -2247,7 +2247,7 @@ fixate_mmc(scgp, dp, trackp)
 	gettimeofday(&starttime, (struct timezone *)0);
 
 	if (dummy && lverbose)
-		printf("WARNING: Some drives don't like fixation in dummy mode.\n");
+		printf("NOTICE: Dummy-mode fixation is drive-dependent; a test-mode fixation rejection is ignored.\n");
 
 	scgp->silent++;
 	if (is_tao(trackp) || is_packet(trackp)) {

@@ -1,6 +1,6 @@
 // AUTO-GENERATED. DO NOT EDIT BY HAND.
 // Source of truth: src/main.cpp :: DrawApp()
-// Windows DrawApp SHA-256: 2d281550b84b14b38a4b7cd3f131d18f76de3428426d98a6d8eea6ecc02dacc6
+// Windows DrawApp SHA-256: 79de08905e40a662ad7cfee82ff31fae83962120207b06cf58e4fc146e605832
 // Linux platform substitutions: optical roots=2, BurnerMAX roots=1, D3D texture handle -> OpenGL ID.
 
 void DrawApp(
@@ -1285,7 +1285,12 @@ void DrawApp(
         }
         ImGui::EndDisabled();
 
-        if (dvdProfile) {
+        // RB_STAGE44AE_CD_DUMMY_WRITE_UI
+        //
+        // RetroBeam supports MMC dummy/test writing for CD targets too.
+        // Expose it here rather than forcing PS1/Saturn/Dreamcast testing
+        // through the permanent BURN DISC path.
+        {
             ImGui::BeginDisabled(!canBurn);
 
             const char* dryRunLabel =
@@ -1293,7 +1298,9 @@ void DrawApp(
                     ? (state.xbox360DiscType == Xbox360DiscType::Xgd3
                         ? "RECOMMENDED: FULL XGD3 PREFLIGHT - NO DISC WRITE"
                         : "DRY RUN DVD+R DL - NO WRITE")
-                    : "DRY RUN DVD - NO WRITE";
+                    : (ps2DvdProfile
+                        ? "DRY RUN DVD - NO WRITE"
+                        : "DUMMY WRITE CD-R - LASER OFF");
 
             if (ImGui::Button(
                     dryRunLabel,
@@ -1333,6 +1340,9 @@ void DrawApp(
                         : (state.useGrowisofsForDvd
                             ? "Full preflight: ABGX360 AutoFix + verification, DVD+R DL/BurnerMAX checks and growisofs dry run."
                             : "Full preflight: ABGX360 AutoFix + verification, DVD+R DL/BurnerMAX checks and RetroBeam no-write preflight."));
+            } else if (!dvdProfile && !burn.busy) {
+                ImGui::TextDisabled(
+                    "RetroBeam -dummy exercises the CD write pipeline with the drive laser disabled.");
             }
         }
 

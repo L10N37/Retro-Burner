@@ -76,7 +76,8 @@ set_target_properties(retrobeam_scg PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED
 # Preinclude suppresses only the obsolete direct-/dev/hd* ATAPI subtransport.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_options(retrobeam_scg PRIVATE
-        "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/retrobeam-linux-sg-preinclude.h"
+        "-include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/retrobeam-linux-sg-preinclude.h"
     )
 endif()
 

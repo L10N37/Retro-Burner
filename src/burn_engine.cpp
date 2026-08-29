@@ -1776,6 +1776,53 @@ void BurnEngine::RunStandardImage(
         return;
     }
 
+    // RB_STAGE44AC_WINDOWS_CUE_AUTHORITY
+    // Do not call a CUE "validated" until the exact parser inside the
+    // RetroBeam executable that will perform the write has accepted it.
+    // --rb-cue-check exits before libscg/drive/media access.
+    if (Lowercase(imagePath.extension().string()) == ".cue") {
+        if (!fs::is_regular_file(retrobeam)) {
+            SetFailure(
+                "The embedded RetroBeam backend could not be prepared for CUE validation.");
+            return;
+        }
+
+        AppendLog(
+            "\r\nAuthoritative RetroBeam CUE parser preflight "
+            "(no optical drive access)\r\n");
+
+        std::string cueCheckOutput;
+        const ProcessResult cueCheck = RunHiddenProcess(
+            retrobeam,
+            {
+                L"--rb-cue-check",
+                imagePath.wstring(),
+            },
+            workingDirectory,
+            [this, &cueCheckOutput](const std::string& text) {
+                cueCheckOutput += text;
+                AppendLog(text);
+            },
+            [](std::string_view) {});
+
+        if (!cueCheck.started) {
+            SetFailure(cueCheck.error);
+            return;
+        }
+
+        if (cueCheck.exitCode != 0 ||
+            cueCheckOutput.find("RB_CUECHECK_OK") == std::string::npos) {
+            SetFailure(
+                "RetroBeam rejected this CUE layout. No disc was touched; "
+                "see Burn Log for the parser reason.");
+            return;
+        }
+
+        AppendLog(
+            "RetroBeam CUE parser: ACCEPTED. The same parsed layout will be "
+            "used for recording.\r\n");
+    }
+
     {
         std::lock_guard lock(mutex_);
         state_.layout = layout;
@@ -1801,11 +1848,6 @@ void BurnEngine::RunStandardImage(
     const bool dvdTarget =
         request.target == BurnTarget::PlayStation2Dvd ||
         request.target == BurnTarget::Xbox360;
-
-    if (request.simulate && !dvdTarget) {
-        SetFailure("Dry run is available only for DVD targets.");
-        return;
-    }
 
     const bool xbox = request.target == BurnTarget::Xbox360;
     const bool xgd3 =
@@ -3133,7 +3175,8 @@ void BurnEngine::RunStandardImage(
         std::lock_guard lock(mutex_);
         state_.stage = BurnStage::BurningSession1;
         state_.busy = true;
-        state_.writing = true;
+        // RB_STAGE44AC_WINDOWS_CD_DUMMY
+        state_.writing = !request.simulate;
         state_.session = 1;
         state_.bufferPercent = -1;
         state_.ringBufferPercent = -1;
@@ -3143,10 +3186,16 @@ void BurnEngine::RunStandardImage(
         state_.progress = 0.0F;
         // RB_STAGE44S_WINDOWS_CD_PHASE_BUFFER_PARITY
         // Match the Linux CD lifecycle from the moment RetroBeam starts.
-        state_.status = "Writing Lead-In...";
+        state_.status =
+            request.simulate
+                ? "Running RetroBeam dummy CD write..."
+                : "Writing Lead-In...";
     }
 
-    AppendLog("\r\nWriting disc\r\n");
+    AppendLog(
+        request.simulate
+            ? "\r\nDummy-writing disc (laser disabled by drive)\r\n"
+            : "\r\nWriting disc\r\n");
 
     std::vector<std::wstring> arguments;
     arguments.push_back(
@@ -3161,11 +3210,21 @@ void BurnEngine::RunStandardImage(
             std::to_wstring(request.requestedSpeedX));
     }
 
+    // RB_STAGE44AC_CD_FIFO_8M
+    // Keep the CD producer FIFO identical on Windows and Linux.
+    arguments.emplace_back(L"fs=8m");
+    arguments.emplace_back(L"gracetime=2");
+
     arguments.push_back(JoinRetroBeamDriverOptions(request));
     AppendLog(RetroBeamAdvancedPolicyText(request));
 
-    if (!request.verifyAfterBurn) {
+    if (!request.verifyAfterBurn &&
+        !request.simulate) {
         arguments.emplace_back(L"-eject");
+    }
+
+    if (request.simulate) {
+        arguments.emplace_back(L"-dummy");
     }
 
     const std::string extension =
@@ -3180,6 +3239,17 @@ void BurnEngine::RunStandardImage(
         request.target ==
             BurnTarget::PlayStation2Cd &&
         extension == ".iso";
+
+    // RB_STAGE44AD_PS1_DAO_CUE
+    //
+    // Ordinary PS1 BIN/CUE images contain 2352-byte sectors but no original
+    // 96-byte P-W subchannel stream. Keep RetroBeam's authoritative CUE
+    // parser, but record these layouts in DAO instead of manufacturing a
+    // RAW96R subchannel stream.
+    const bool ps1Cue =
+        request.target ==
+            BurnTarget::PlayStation &&
+        extension == ".cue";
 
     arguments.emplace_back(
         ps2CdIso
@@ -3204,6 +3274,13 @@ void BurnEngine::RunStandardImage(
         arguments.push_back(imagePath.wstring());
     }
 
+    if (ps1Cue) {
+        AppendLog(
+            "\r\nPS1 recording mode: DAO / CDRWIN CUE\r\n"
+            "RetroBeam will preserve the parsed mixed-mode CUE layout "
+            "without forcing a synthetic RAW96R P-W stream.\r\n");
+    }
+
     if (ps2CdIso) {
         AppendLog(
             "\r\nPS2 CD ISO recording mode: "
@@ -3217,6 +3294,13 @@ void BurnEngine::RunStandardImage(
     static const std::regex progressPattern(
         R"(Track\s+(\d+):\s+([0-9]+(?:\.[0-9]+)?)\s+of\s+([0-9]+(?:\.[0-9]+)?)\s+([kMGT]?B)\s+written)",
         std::regex::icase);
+    // RB_STAGE44AF_WINDOWS_EXACT_CD_PROGRESS
+    // Whole-disc percentage calculated from the actual sector position
+    // inside RetroBeam. This is authoritative for uneven CUE tracks.
+    static const std::regex discProgressPattern(
+        R"(\[disc\s*([0-9]+(?:\.[0-9]+)?)%\])",
+        std::regex::icase);
+
     static const std::regex fifoPattern(
         R"(\(fifo\s*([0-9]+)%\))",
         std::regex::icase);
@@ -3301,6 +3385,23 @@ void BurnEngine::RunStandardImage(
                 if (backendPhase.empty()) {
                     backendPhase = "Writing Sectors...";
                 }
+            }
+
+            // Override the fallback per-track estimate whenever
+            // RetroBeam provides its exact whole-disc percentage.
+            if (std::regex_search(
+                    line,
+                    match,
+                    discProgressPattern)) {
+                const double discPercent =
+                    std::stod(match[1].str());
+
+                progress =
+                    static_cast<float>(
+                        std::clamp(
+                            discPercent / 100.0,
+                            0.0,
+                            0.999));
             }
 
             if (std::regex_search(
@@ -3418,6 +3519,16 @@ void BurnEngine::RunStandardImage(
             SummarizeRetroBeamFailure(
                 retroBeamBurnOutput);
 
+        if (request.simulate) {
+            SetFailure(
+                detail.empty()
+                    ? "RetroBeam dummy CD write failed. "
+                      "The recording laser was disabled."
+                    : "RetroBeam dummy CD write failed: " +
+                          detail);
+            return;
+        }
+
         SetFailure(
             detail.empty()
                 ? std::string(
@@ -3430,7 +3541,45 @@ void BurnEngine::RunStandardImage(
     }
 
 
-    // Explicit optional verification. Unchecked requests never enter here.
+    if (request.simulate) {
+        std::lock_guard lock(mutex_);
+        state_.stage = BurnStage::Ready;
+        state_.busy = false;
+        state_.writing = false;
+        state_.progress = 0.0F;
+        state_.bufferPercent = -1;
+        state_.ringBufferPercent = -1;
+        state_.driveBufferPercent = -1;
+        state_.remainingTime.clear();
+        state_.status =
+            "RetroBeam dummy CD write passed. No disc sectors were written.";
+        return;
+    }
+
+
+    // RB_STAGE44AF_WINDOWS_DUMMY_RESULT
+    if (request.simulate) {
+        AppendLog(
+            "\r\n"
+            "============================================================\r\n"
+            " DUMMY WRITE PASSED\r\n"
+            " All tracks and finalisation completed successfully.\r\n"
+            " Recording laser remained OFF; CD-R was not written.\r\n"
+            "============================================================\r\n");
+
+        std::lock_guard lock(mutex_);
+
+        state_.stage = BurnStage::Ready;
+        state_.busy = false;
+        state_.writing = false;
+        state_.progress = 1.0F;
+        state_.status =
+            "Dummy write passed - full CD pipeline completed; "
+            "recording laser remained off and the CD-R was not written.";
+        return;
+    }
+
+// Explicit optional verification. Unchecked requests never enter here.
     if (request.verifyAfterBurn &&
         request.target ==
             BurnTarget::PlayStation2Cd &&

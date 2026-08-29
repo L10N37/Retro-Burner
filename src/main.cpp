@@ -2041,7 +2041,12 @@ void DrawApp(
         }
         ImGui::EndDisabled();
 
-        if (dvdProfile) {
+        // RB_STAGE44AE_CD_DUMMY_WRITE_UI
+        //
+        // RetroBeam supports MMC dummy/test writing for CD targets too.
+        // Expose it here rather than forcing PS1/Saturn/Dreamcast testing
+        // through the permanent BURN DISC path.
+        {
             ImGui::BeginDisabled(!canBurn);
 
             const char* dryRunLabel =
@@ -2049,7 +2054,9 @@ void DrawApp(
                     ? (state.xbox360DiscType == Xbox360DiscType::Xgd3
                         ? "RECOMMENDED: FULL XGD3 PREFLIGHT - NO DISC WRITE"
                         : "DRY RUN DVD+R DL - NO WRITE")
-                    : "DRY RUN DVD - NO WRITE";
+                    : (ps2DvdProfile
+                        ? "DRY RUN DVD - NO WRITE"
+                        : "DUMMY WRITE CD-R - LASER OFF");
 
             if (ImGui::Button(
                     dryRunLabel,
@@ -2094,6 +2101,9 @@ void DrawApp(
                         : (state.useGrowisofsForDvd
                             ? "Full preflight: ABGX360 AutoFix + verification, DVD+R DL/BurnerMAX checks and growisofs dry run."
                             : "Full preflight: ABGX360 AutoFix + verification, DVD+R DL/BurnerMAX checks and RetroBeam no-write preflight."));
+            } else if (!dvdProfile && !burn.busy) {
+                ImGui::TextDisabled(
+                    "RetroBeam -dummy exercises the CD write pipeline with the drive laser disabled.");
             }
         }
 

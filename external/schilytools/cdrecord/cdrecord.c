@@ -323,6 +323,26 @@ main(ac, av)
 	char	errstr[80];
 	BOOL	gracedone = FALSE;
 
+/* RB_STAGE44AC_RETROBEAM_CUECHECK
+	 * Parse a CDRWIN CUE with the exact parser used by recording, but exit
+	 * before privilege handling, libscg open, drive discovery, or media I/O.
+	 * This is intentionally an internal Retro Burner preflight interface.
+	 */
+	if (ac == 3 && strcmp(av[1], "--rb-cue-check") == 0) {
+		save_args(ac, av);
+		fillbytes(track, sizeof (track), '\0');
+		for (i = 0; i < MAX_TRACK+2; i++)
+			track[i].track = track[i].trackno = i;
+		track[0].tracktype = TOC_MASK;
+
+		parsecue(av[2], track);
+		tracks = track[0].tracks;
+
+		printf("RB_CUECHECK_OK tracks=%d\n", tracks);
+		flush();
+		return (0);
+	}
+
 #if	defined(__MINGW32__) && !defined(__CYGWIN__)
 	/*
 	 * Hidden RetroBurner engineering probe. It exits before argument parsing,
@@ -2667,6 +2687,39 @@ int oper = -1;
 			else
 				printf(" MB");
 			printf(_(" written"));
+
+			/*
+			 * RB_STAGE44AD_CD_DISC_PROGRESS
+			 *
+			 * Per-track progress resets at every CUE track.  Export an
+			 * explicit whole-disc percentage so Retro Burner does not
+			 * interpret completion of track 1 as completion of the disc.
+			 *
+			 * Leave 100% to the frontend's successful-completion state;
+			 * recording telemetry tops out at 99.9 while finalisation runs.
+			 */
+			if ((dp->cdr_dstat->ds_flags & DSF_NOCD) == 0) {
+				track_t *rb_base = track_base(trackp);
+				long rb_total_secs =
+					rb_base[trackp->tracks + 1].trackstart;
+				long rb_done_secs =
+					trackp->trackstart +
+					(long)(bytes / secsize);
+
+				if (rb_total_secs > 0 && rb_done_secs >= 0) {
+					double rb_disc_percent =
+						100.0 * (double)rb_done_secs /
+						(double)rb_total_secs;
+
+					if (rb_disc_percent < 0.0)
+						rb_disc_percent = 0.0;
+					if (rb_disc_percent > 99.9)
+						rb_disc_percent = 99.9;
+
+					printf(" [disc %5.1f%%]", rb_disc_percent);
+				}
+			}
+
 			fper = fifo_percent(TRUE);
 			if (fper >= 0)
 				printf(_(" (fifo %3d%%)"), fper);

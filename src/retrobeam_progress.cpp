@@ -104,6 +104,11 @@ RetroBeamProgressUpdate ParseRetroBeamProgressText(
         R"(Track\s+(\d+):\s+([0-9]+(?:\.[0-9]+)?)\s+of\s+([0-9]+(?:\.[0-9]+)?)\s+([kMGT]?B)\s+written)",
         std::regex::icase);
 
+    // RB_STAGE44AD_CD_DISC_PROGRESS
+    static const std::regex discProgressPattern(
+        R"(\[disc\s*([0-9]+(?:\.[0-9]+)?)%\])",
+        std::regex::icase);
+
     static const std::regex fifoPattern(
         R"(\(fifo\s*([0-9]+)%\))",
         std::regex::icase);
@@ -128,6 +133,24 @@ RetroBeamProgressUpdate ParseRetroBeamProgressText(
             update.progress = static_cast<float>(
                 std::clamp(written / total, 0.0, 0.999));
         }
+    }
+
+    // A CUE burn reports X/Y independently for every track. Prefer
+    // RetroBeam's whole-disc CD telemetry when it is available.
+    for (std::sregex_iterator i(
+             text.begin(),
+             text.end(),
+             discProgressPattern), e;
+         i != e; ++i) {
+        const double percent =
+            std::stod((*i)[1].str());
+
+        update.progress =
+            static_cast<float>(
+                std::clamp(
+                    percent / 100.0,
+                    0.0,
+                    0.999));
     }
 
     // Keep the track-writing phase alive even after the original

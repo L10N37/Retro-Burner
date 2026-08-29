@@ -39,6 +39,7 @@ ComPtr<IDXGISwapChain> g_swapChain;
 ComPtr<ID3D11RenderTargetView> g_renderTarget;
 bool g_driveRefreshRequested = false;
 bool g_jobInProgress = false;
+bool g_closeWarningRequested = false;
 const bool g_uiSimulationMode =
     UiBurnSimulationRequested();
 std::wstring g_droppedPath;
@@ -2458,11 +2459,10 @@ LRESULT WINAPI WindowProcedure(
         break;
     case WM_CLOSE:
         if (g_jobInProgress) {
-            MessageBoxW(
-                window,
-                L"Retro Burner is still working. Keep the app open until the current operation finishes; closing during a write can ruin the disc.",
-                L"Operation in progress",
-                MB_OK | MB_ICONWARNING);
+            // RB_STAGE44AJ_WINDOWS_ACTIVE_BURN_CLOSE_GUARD
+            // Do not block the render/event loop with MessageBoxW.
+            // Queue the same in-app warning used by Linux instead.
+            g_closeWarningRequested = true;
             return 0;
         }
         DestroyWindow(window);
@@ -2653,6 +2653,41 @@ int WINAPI wWinMain(
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         DrawApp(state, burnEngine, artworks, disc);
+
+        // RB_STAGE44AJ_WINDOWS_CLOSE_WARNING_MODAL
+        if (g_closeWarningRequested) {
+            ImGui::OpenPopup(
+                "Operation in progress##ActiveBurnCloseGuard");
+            g_closeWarningRequested = false;
+        }
+
+        const ImGuiViewport* closeGuardViewport =
+            ImGui::GetMainViewport();
+
+        ImGui::SetNextWindowPos(
+            closeGuardViewport->GetCenter(),
+            ImGuiCond_Appearing,
+            ImVec2(0.5F, 0.5F));
+
+        if (ImGui::BeginPopupModal(
+                "Operation in progress##ActiveBurnCloseGuard",
+                nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextWrapped(
+                "Retro Burner is still working. Keep the app open "
+                "until the current operation finishes; closing during "
+                "a write can ruin the disc.");
+
+            ImGui::Spacing();
+
+            if (ImGui::Button(
+                    "OK",
+                    ImVec2(120.0F, 0.0F))) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
 
         ImGui::Render();
         constexpr float clearColor[4] = {0.0F, 0.0F, 0.0F, 1.0F};

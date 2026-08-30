@@ -64,6 +64,7 @@ namespace {
 constexpr std::uint16_t kRegisterBase = 0x8000;
 constexpr std::uint16_t kRegisterEnd = 0x9000;
 constexpr std::uint32_t kXgd3LayerBoundary = 2133520;
+constexpr std::uint32_t kXgd3ImageSectors = 4267015;
 constexpr std::size_t kRegisterCount =
     static_cast<std::size_t>(kRegisterEnd - kRegisterBase);
 constexpr std::size_t kSenseBytes = 32;
@@ -338,11 +339,12 @@ void RbLogDeviceIdentity(
     const UCHAR dataDirection,
     void* const data,
     const ULONG dataLength,
-    std::string& error) {
+    std::string& error,
+    const UCHAR cdbLength = 12) {
     ScsiPacket packet{};
     packet.sptd.Length =
         static_cast<USHORT>(sizeof(SCSI_PASS_THROUGH_DIRECT));
-    packet.sptd.CdbLength = 12;
+    packet.sptd.CdbLength = cdbLength;
     packet.sptd.SenseInfoLength =
         static_cast<UCHAR>(packet.sense.size());
     packet.sptd.DataIn = dataDirection;
@@ -460,6 +462,62 @@ void RbLogDeviceIdentity(
         (static_cast<std::uint32_t>(data[9]) << 16U) |
         (static_cast<std::uint32_t>(data[10]) << 8U) |
         static_cast<std::uint32_t>(data[11]);
+    return true;
+}
+
+[[nodiscard]] bool ReadTrackCapacity(
+    const HANDLE drive,
+    const ULONG alignmentMask,
+    std::uint32_t& freeBlocks,
+    std::uint32_t& trackSize,
+    std::string& error) {
+    alignas(64) std::array<UCHAR, 32> data{};
+    std::array<UCHAR, 12> cdb{};
+
+    // MMC READ TRACK INFORMATION (10-byte CDB), addressed by
+    // track number. Blank DVD+R DL media exposes writable
+    // capacity through track 1.
+    cdb[0] = 0x52;
+    cdb[1] = 0x01; // address type: track number
+    cdb[5] = 0x01; // track 1
+    cdb[8] = static_cast<UCHAR>(data.size());
+
+    if (!SendScsi(
+            drive,
+            alignmentMask,
+            cdb,
+            SCSI_IOCTL_DATA_IN,
+            data.data(),
+            static_cast<ULONG>(data.size()),
+            error,
+            10)) {
+        return false;
+    }
+
+    const std::uint16_t informationLength =
+        (static_cast<std::uint16_t>(data[0]) << 8U) |
+        static_cast<std::uint16_t>(data[1]);
+
+    // Need response bytes through 27 for Track Size.
+    if (informationLength < 26U) {
+        error =
+            "READ TRACK INFORMATION returned a response too short "
+            "to contain writable-capacity fields";
+        return false;
+    }
+
+    const auto readBe32 =
+        [&data](const std::size_t offset) -> std::uint32_t {
+            return
+                (static_cast<std::uint32_t>(data[offset]) << 24U) |
+                (static_cast<std::uint32_t>(data[offset + 1U]) << 16U) |
+                (static_cast<std::uint32_t>(data[offset + 2U]) << 8U) |
+                static_cast<std::uint32_t>(data[offset + 3U]);
+        };
+
+    freeBlocks = readBe32(16U);
+    trackSize = readBe32(24U);
+
     return true;
 }
 
@@ -1147,6 +1205,67 @@ BurnerMaxResult EnableBurnerMax(
             log,
             "BurnerMAX: XGD3 layer boundary is already present; "
             "verifying active MTK register state instead of trusting the boundary alone.\r\n");
+
+        // Permanently-flashed BurnerMAX firmware does not
+        // necessarily expose the same RAM signature pattern as the
+        // temporary payload. First verify observable MMC behaviour:
+        // expanded writable capacity plus the XGD3 layer boundary.
+        std::uint32_t freeBlocks = 0;
+        std::uint32_t trackSize = 0;
+        std::string capacityError;
+
+        if (ReadTrackCapacity(
+                drive.value,
+                alignmentMask,
+                freeBlocks,
+                trackSize,
+                capacityError)) {
+            const std::uint32_t writableCapacity =
+                std::max(freeBlocks, trackSize);
+
+            Log(
+                log,
+                "BurnerMAX: READ TRACK INFORMATION reports free blocks " +
+                    std::to_string(freeBlocks) +
+                    ", track size " +
+                    std::to_string(trackSize) +
+                    " sectors.\r\n");
+
+            if (writableCapacity >= kXgd3ImageSectors) {
+                result.status = BurnerMaxStatus::AlreadyEnabled;
+                result.backend = "MMC capacity";
+                result.message =
+                    "BurnerMAX is already active; expanded writable "
+                    "capacity (" +
+                    std::to_string(writableCapacity) +
+                    " sectors) and XGD3 layer boundary 2133520 were "
+                    "verified. Temporary payload injection is not required.";
+
+                Log(
+                    log,
+                    "BurnerMAX: expanded XGD3 writable capacity is "
+                    "already exposed by the drive; skipping temporary "
+                    "payload register verification.\r\n");
+
+                return result;
+            }
+
+            Log(
+                log,
+                "BurnerMAX: XGD3 boundary is present, but writable "
+                "capacity is only " +
+                    std::to_string(writableCapacity) +
+                    " sectors; falling back to strict MTK register "
+                    "verification.\r\n");
+        } else {
+            Log(
+                log,
+                "BurnerMAX: READ TRACK INFORMATION capacity check "
+                "was unavailable (" +
+                    capacityError +
+                    "); falling back to strict MTK register "
+                    "verification.\r\n");
+        }
 
         std::string activeF1Error;
         if (VerifyActivePayloadFamily(

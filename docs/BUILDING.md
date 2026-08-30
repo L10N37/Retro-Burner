@@ -135,8 +135,8 @@ Windows:
 Produces:
 
 ```text
-dist/RetroBurner-0.5.0-windows-x64.zip
-dist/RetroBurner-0.5.0-windows-x64.zip.sha256
+dist/RetroBurner-0.5.1-windows-x64.zip
+dist/RetroBurner-0.5.1-windows-x64.zip.sha256
 ```
 
 Linux:
@@ -148,8 +148,8 @@ Linux:
 Produces:
 
 ```text
-dist/RetroBurner-0.5.0-linux-x86_64.tar.gz
-dist/RetroBurner-0.5.0-linux-x86_64.tar.gz.sha256
+dist/RetroBurner-0.5.1-linux-x86_64.tar.gz
+dist/RetroBurner-0.5.1-linux-x86_64.tar.gz.sha256
 ```
 
 Each archive contains the application plus README/release/licence documentation.

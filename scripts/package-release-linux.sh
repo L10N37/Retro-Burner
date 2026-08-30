@@ -8,7 +8,7 @@ ROOT="$(
     pwd
 )"
 
-VERSION="0.5.0"
+VERSION="0.5.1"
 PACKAGE_NAME="RetroBurner-${VERSION}-linux-x86_64"
 
 DIST="$ROOT/dist"
@@ -141,7 +141,7 @@ strip --strip-unneeded \
 for document in \
     LICENSE \
     README.md \
-    RELEASE_NOTES_0.5.0.md \
+    RELEASE_NOTES_0.5.1.md \
     THIRD_PARTY.md
 do
     [[ -f "$ROOT/$document" ]] || {
@@ -170,7 +170,7 @@ echo "[6/8] Validate staged release"
 
 VERSION_OUTPUT="$("$PACKAGE_ROOT/RetroBurner" --version)"
 
-if [[ "$VERSION_OUTPUT" != "Retro Burner 0.5.0 Linux" ]]; then
+if [[ "$VERSION_OUTPUT" != "Retro Burner 0.5.1 Linux" ]]; then
     echo "[FAIL] Unexpected packaged version:" >&2
     echo "  $VERSION_OUTPUT" >&2
     exit 7

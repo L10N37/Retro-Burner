@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(RetroBurner VERSION 0.5.0 LANGUAGES C CXX)
+project(RetroBurner VERSION 0.5.1 LANGUAGES C CXX)
 
 # The Windows resource compiler is only required for the native Win32 GUI.
 # Keeping RC out of the project language list lets the same top-level CMake

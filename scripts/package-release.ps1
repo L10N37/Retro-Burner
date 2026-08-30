@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$version = "0.5.0"
+$version = "0.5.1"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $distRoot = Join-Path $projectRoot "dist"
 $packageName = "RetroBurner-$version-windows-x64"
@@ -25,7 +25,7 @@ New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 
 Copy-Item -LiteralPath $binary -Destination (Join-Path $packageRoot "RetroBurner.exe")
 Copy-Item -LiteralPath (Join-Path $projectRoot "README.md") -Destination $packageRoot
-Copy-Item -LiteralPath (Join-Path $projectRoot "RELEASE_NOTES_0.5.0.md") -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $projectRoot "RELEASE_NOTES_0.5.1.md") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "THIRD_PARTY.md") -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "licenses") -Destination $packageRoot -Recurse

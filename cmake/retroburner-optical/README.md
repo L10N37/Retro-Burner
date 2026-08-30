@@ -4,7 +4,7 @@ This directory is Retro Burner's owned CMake/integration layer for the pinned Sc
 
 The upstream cdrtools authorship/licence remains preserved. Retro Burner owns the modern build glue, platform adaptation and frontend integration in this directory.
 
-## Current 0.5.0 state
+## Current 0.5.1 state
 
 The bridge builds the RetroBeam-linked source set natively for both supported desktop targets:
 

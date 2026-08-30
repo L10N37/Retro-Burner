@@ -69,9 +69,9 @@ Retro Burner original code is MIT licensed. **That does not relicense any third-
 
 Before release, verify that every asset under `assets/` and `Images/` is project-created or has documented permission/licensing. Console/platform names/logos may also be trademarks; credits do not imply endorsement.
 
-## 0.5.0 packaging notes
+## 0.5.1 packaging notes
 
-Windows and Linux release archives should include the application, `README.md`, `RELEASE_NOTES_0.5.0.md`, project `LICENSE`, `THIRD_PARTY.md` and the `licenses/` directory.
+Windows and Linux release archives should include the application, `README.md`, `RELEASE_NOTES_0.5.1.md`, project `LICENSE`, `THIRD_PARTY.md` and the `licenses/` directory.
 
 The tagged GitHub repository is the corresponding project/source state for the release. Platform-specific helper provenance above must remain accurate.
 

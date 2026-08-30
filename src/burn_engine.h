@@ -73,7 +73,7 @@ struct BurnRequest final {
     // RB_STAGE44M_OPTIONAL_VERIFY_FLAG
     //
     // Optional, explicit post-burn full logical-sector readback.
-    // OFF by default. The 0.5.0 UI currently exposes this only for
+    // OFF by default. The UI currently exposes this only for
     // single-track PS2 CD .iso burns, whose 2048-byte logical sectors
     // can be compared directly with the source ISO on both OSes.
     bool verifyAfterBurn = false;

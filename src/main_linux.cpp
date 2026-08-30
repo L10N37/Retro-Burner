@@ -1631,7 +1631,7 @@ int RunGui(
 {
     SDL_SetAppMetadata(
         "Retro Burner",
-        "0.5.0",
+        "0.5.1",
         "io.github.L10N37.RetroBurner");
 
     if (!SDL_Init(
@@ -2128,7 +2128,7 @@ int main(
                 argv[i],
                 "--version") == 0) {
             std::printf(
-                "Retro Burner 0.5.0 Linux\n");
+                "Retro Burner 0.5.1 Linux\n");
             return 0;
         }
 

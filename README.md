@@ -4,11 +4,21 @@
 
 Retro Burner is a native **Windows and Linux** optical-disc burning frontend for classic game consoles. The goal is to replace a pile of console-specific burning utilities, command lines and old guides with one profile-driven application while keeping enough backend choice, logging and diagnostics to troubleshoot difficult writer/media combinations.
 
-**Current version: 0.5.0**
+**Current version: 0.5.1**
 
 Retro Burner is intended only for images and backups that you are legally entitled to use.
 
-## 0.5.0 at a glance
+## 0.5.1 at a glance
+
+0.5.1 is a focused BurnerMAX compatibility release. Permanently flashed C4EVA/iXtreme BurnerMAX-capable drives are now recognized from their expanded XGD3 writable capacity and correct layer boundary instead of being incorrectly rejected by temporary-payload RAM-signature checks.
+
+The existing strict F1/DF temporary-payload path remains intact for stock drives that require BurnerMAX activation.
+
+The fix has been hardware validated on Windows and Fedora Linux with both permanently flashed and temporary-payload drive paths.
+
+See [`RELEASE_NOTES_0.5.1.md`](RELEASE_NOTES_0.5.1.md) for the 0.5.1 release summary.
+
+## 0.5.0 feature highlights
 
 0.5.0 is a substantial release. Linux is now a first-class native target, and the Windows build also receives a large set of safety, preflight, burn-monitoring and quality-of-life improvements.
 
@@ -51,14 +61,14 @@ The Linux build is a native SDL3/OpenGL application using Linux SG_IO for optica
 
 The Linux executable embeds Retro Burner's artwork plus native RetroBeam, CDIrip and ABGX360 helper binaries. The selectable DVD `growisofs` path and `dvd+rw-mediainfo` remain **host Linux dependencies** rather than being embedded.
 
-The 0.5.0 Linux asset is a normal native ELF, not an AppImage/Flatpak. A compatible SDL3, SDL3_image, OpenGL and libc environment is required.
+The 0.5.1 Linux asset is a normal native ELF, not an AppImage/Flatpak. A compatible SDL3, SDL3_image, OpenGL and libc environment is required.
 
 ## Supported console profiles
 
-| Console | Image format | Recording path | 0.5.0 status |
+| Console | Image format | Recording path | Status |
 | --- | --- | --- | --- |
 | Dreamcast | CDI | CDIrip + RetroBeam | Physically tested workflow |
-| PlayStation | BIN/CUE | RetroBeam CDRWIN CUE + DAO/SAO | **0.5.0 DAO path physically validated** |
+| PlayStation | BIN/CUE | RetroBeam CDRWIN CUE + DAO/SAO | **DAO path physically validated** |
 | PlayStation 2 CD | BIN/CUE or ISO | RetroBeam | Implemented; ISO media-type guard and optional ISO readback verification added |
 | PlayStation 2 DVD | ISO, DVD5/DVD9 | RetroBeam or growisofs | DVD5 physically tested; DVD9 implemented but not physically validated |
 | Sega Saturn | BIN/CUE | RetroBeam CDRWIN CUE + DAO/SAO | Implemented; broader physical regression coverage still welcome |
@@ -236,7 +246,7 @@ Retro-Burner/
 |-- src/                             Retro Burner C++ source
 |-- CMakeLists.txt
 |-- README.md
-|-- RELEASE_NOTES_0.5.0.md
+|-- RELEASE_NOTES_0.5.1.md
 |-- THIRD_PARTY.md
 |-- CHANGELOG.md
 `-- LICENSE

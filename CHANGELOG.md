@@ -4,7 +4,7 @@ All notable project changes are recorded here.
 
 ## [Unreleased]
 
-### Planned after 0.5.0
+### Planned
 
 - Broaden Linux distribution, writer, bridge and media testing.
 - Complete XGD3 end-to-end validation on known-compatible hardware.
@@ -16,6 +16,18 @@ All notable project changes are recorded here.
 - Add an optional GitHub Releases update check.
 - Add an explicit advanced 32 KiB / 64 KiB recording-transfer compatibility control.
 - Consider macOS and 32-bit Windows targets after the Windows/Linux architecture is settled.
+
+## [0.5.1] - 2026-08-30
+
+0.5.1 is a focused BurnerMAX compatibility fix.
+
+### BurnerMAX
+
+- Fixed false rejection of drives permanently flashed with C4EVA/iXtreme BurnerMAX-capable firmware.
+- Added capacity-first already-enabled detection using the XGD3 layer boundary and expanded writable sector count.
+- Avoided unnecessary temporary payload injection when a drive already exposes full XGD3 capacity.
+- Preserved strict F1/DF payload activation and read-back verification for stock drives that still require the temporary BurnerMAX payload.
+- Hardware validated on Windows and Fedora Linux with both permanent-firmware and temporary-payload drive paths.
 
 ## [0.5.0] - 2026-08-30
 

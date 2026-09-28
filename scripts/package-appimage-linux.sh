@@ -114,7 +114,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 "$LINUXDEPLOY"     --appdir "$APPDIR"     --executabl
 # Keep only the dependency libraries linuxdeploy discovered for them.
 rm -f     "$APPDIR/usr/bin/retrobeam"     "$APPDIR/usr/bin/abgx360"     "$APPDIR/usr/bin/cdirip"
 
-install -m 0644     "$METAINFO"     "$APPDIR/usr/share/metainfo/${APP_ID}.metainfo.xml"
+install -m 0644     "$METAINFO"     "$APPDIR/usr/share/metainfo/${APP_ID}.appdata.xml"
 
 echo
 echo "[5/8] Validate AppDir"
@@ -128,7 +128,7 @@ echo "[5/8] Validate AppDir"
 }
 
 desktop-file-validate "$APPDIR/usr/share/applications/${APP_ID}.desktop"
-appstreamcli validate --no-net "$APPDIR/usr/share/metainfo/${APP_ID}.metainfo.xml"
+appstreamcli validate --no-net "$APPDIR/usr/share/metainfo/${APP_ID}.appdata.xml"
 
 VERSION_OUTPUT="$("$APPDIR/AppRun" --version)"
 EXPECTED_VERSION="Retro Burner ${VERSION} Linux"
@@ -147,6 +147,13 @@ rm -f "$OUTPUT" "$ZSYNC"
 ARCH="$ARCH" VERSION="$VERSION" APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGETOOL"     -u "$UPDATE_INFORMATION"     "$APPDIR"     "$OUTPUT"
 
 [[ -x "$OUTPUT" ]] || chmod 0755 "$OUTPUT"
+
+# appimagetool writes the .zsync next to the current working directory when
+# an explicit AppImage output path is supplied. Normalize it into dist/.
+GENERATED_ZSYNC="$(basename "$OUTPUT").zsync"
+if [[ ! -f "$ZSYNC" && -f "$GENERATED_ZSYNC" ]]; then
+    mv "$GENERATED_ZSYNC" "$ZSYNC"
+fi
 
 echo
 echo "[7/8] Smoke-test AppImage"

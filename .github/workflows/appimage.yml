@@ -1,0 +1,85 @@
+name: Build Retro Burner AppImage
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - appimage-catalog
+    paths:
+      - ".github/workflows/appimage.yml"
+      - "packaging/linux/**"
+      - "scripts/package-appimage-linux.sh"
+      - "build-linux.sh"
+      - "CMakeLists.txt"
+      - "src/**"
+      - "assets/**"
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    env:
+      SDL_VERSION: "3.2.22"
+      SDL_IMAGE_VERSION: "3.2.4"
+
+    steps:
+      - name: Check out Retro Burner
+        uses: actions/checkout@v4
+
+      - name: Install build and AppImage dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y             appstream             autoconf             automake             build-essential             cmake             curl             desktop-file-utils             dvd+rw-tools             git             libasound2-dev             libcurl4-openssl-dev             libdbus-1-dev             libdecor-0-dev             libgl1-mesa-dev             libjpeg-dev             libpng-dev             libpulse-dev             libtool             libudev-dev             libwayland-dev             libx11-dev             libxcursor-dev             libxext-dev             libxfixes-dev             libxi-dev             libxrandr-dev             libxss-dev             libxtst-dev             ninja-build             pkg-config             python3             zlib1g-dev             zsync
+
+      - name: Build SDL3
+        run: |
+          git clone             --depth 1             --branch "release-${SDL_VERSION}"             https://github.com/libsdl-org/SDL.git             /tmp/SDL
+
+          cmake             -S /tmp/SDL             -B /tmp/SDL-build             -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_INSTALL_PREFIX=/usr/local             -DSDL_TESTS=OFF             -DSDL_EXAMPLES=OFF
+
+          cmake --build /tmp/SDL-build --parallel
+          sudo cmake --install /tmp/SDL-build
+
+      - name: Build SDL3_image
+        run: |
+          git clone             --depth 1             --branch "release-${SDL_IMAGE_VERSION}"             --recurse-submodules             https://github.com/libsdl-org/SDL_image.git             /tmp/SDL_image
+
+          cmake             -S /tmp/SDL_image             -B /tmp/SDL_image-build             -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_INSTALL_PREFIX=/usr/local             -DSDLIMAGE_SAMPLES=OFF             -DSDLIMAGE_TESTS=OFF
+
+          cmake --build /tmp/SDL_image-build --parallel
+          sudo cmake --install /tmp/SDL_image-build
+          sudo ldconfig
+
+      - name: Build AppImage and zsync
+        env:
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig
+          CMAKE_PREFIX_PATH: /usr/local
+        run: |
+          chmod +x scripts/package-appimage-linux.sh
+          ./scripts/package-appimage-linux.sh 0.5.1
+
+      - name: Show AppImage metadata
+        run: |
+          APPIMAGE_EXTRACT_AND_RUN=1             ./dist/Retro-Burner-0.5.1-x86_64.AppImage --appimage-version || true
+
+          ls -lh             dist/Retro-Burner-0.5.1-x86_64.AppImage             dist/Retro-Burner-0.5.1-x86_64.AppImage.zsync
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Retro-Burner-0.5.1-AppImage
+          path: |
+            dist/Retro-Burner-0.5.1-x86_64.AppImage
+            dist/Retro-Burner-0.5.1-x86_64.AppImage.zsync
+          if-no-files-found: error
+
+      - name: Publish AppImage to v0.5.1
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/appimage-catalog'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v0.5.1             dist/Retro-Burner-0.5.1-x86_64.AppImage             dist/Retro-Burner-0.5.1-x86_64.AppImage.zsync             --clobber

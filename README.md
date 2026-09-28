@@ -61,7 +61,7 @@ The Linux build is a native SDL3/OpenGL application using Linux SG_IO for optica
 
 The Linux executable embeds Retro Burner's artwork plus native RetroBeam, CDIrip and ABGX360 helper binaries. The selectable DVD `growisofs` path and `dvd+rw-mediainfo` remain **host Linux dependencies** rather than being embedded.
 
-The 0.5.1 Linux asset is a normal native ELF, not an AppImage/Flatpak. A compatible SDL3, SDL3_image, OpenGL and libc environment is required.
+The 0.5.1 release now also provides an official AppImage: `Retro-Burner-0.5.1-x86_64.AppImage`. It bundles Retro Burner's SDL3/SDL3_image runtime dependencies and embeds AppImage update information; the matching `.zsync` file is published beside it. The existing native ELF tarball remains available for users who prefer the normal Linux package. The optional `growisofs` / `dvd+rw-mediainfo` backend remains a host dependency.
 
 ## Supported console profiles
 

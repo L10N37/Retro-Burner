@@ -154,6 +154,21 @@ dist/RetroBurner-0.5.1-linux-x86_64.tar.gz.sha256
 
 Each archive contains the application plus README/release/licence documentation.
 
+AppImage:
+
+```bash
+./scripts/package-appimage-linux.sh 0.5.1
+```
+
+Produces:
+
+```text
+dist/Retro-Burner-0.5.1-x86_64.AppImage
+dist/Retro-Burner-0.5.1-x86_64.AppImage.zsync
+```
+
+The AppImage is assembled with the metadata in `packaging/linux/`, bundles the deployable Linux runtime libraries, embeds GitHub-release update information, and is smoke-tested with `--version` before publication.
+
 ## Shared architecture
 
 Shared interfaces/concepts include:

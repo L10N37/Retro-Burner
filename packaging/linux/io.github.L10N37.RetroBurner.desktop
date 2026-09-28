@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Retro Burner
+GenericName=Retro Console Disc Burner
+Comment=Burn optical disc images for classic game consoles
+Exec=RetroBurner
+Icon=io.github.L10N37.RetroBurner
+Terminal=false
+Categories=Utility;DiscBurning;
+Keywords=retro;console;disc;burn;CD;DVD;Dreamcast;PlayStation;Saturn;Xbox;
+StartupNotify=true
+StartupWMClass=io.github.L10N37.RetroBurner

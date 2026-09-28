@@ -33,7 +33,7 @@ jobs:
       - name: Install build and AppImage dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y             appstream             autoconf             automake             build-essential             cmake             curl             desktop-file-utils             git             libasound2-dev             libcurl4-openssl-dev             libdbus-1-dev             libdecor-0-dev             libgl1-mesa-dev             libjpeg-dev             libpng-dev             libpulse-dev             libtool             libudev-dev             libwayland-dev             libx11-dev             libxcursor-dev             libxext-dev             libxfixes-dev             libxi-dev             libxrandr-dev             libxss-dev             libxtst-dev             ninja-build             pkg-config             python3             zlib1g-dev             zsync
+          sudo apt-get install -y             appstream             autoconf             automake             build-essential             cmake             curl             desktop-file-utils             dvd+rw-tools             git             libasound2-dev             libcurl4-openssl-dev             libdbus-1-dev             libdecor-0-dev             libgl1-mesa-dev             libjpeg-dev             libpng-dev             libpulse-dev             libtool             libudev-dev             libwayland-dev             libx11-dev             libxcursor-dev             libxext-dev             libxfixes-dev             libxi-dev             libxrandr-dev             libxss-dev             libxtst-dev             ninja-build             pkg-config             python3             zlib1g-dev             zsync
 
       - name: Build SDL3
         run: |

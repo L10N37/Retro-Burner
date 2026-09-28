@@ -23,7 +23,8 @@ CDIRIP="$ROOT/build/linux/cdirip-release/cdirip"
 
 DESKTOP="$ROOT/packaging/linux/${APP_ID}.desktop"
 METAINFO="$ROOT/packaging/linux/${APP_ID}.metainfo.xml"
-ICON="$ROOT/assets/RetroBurner.png"
+ICON_SOURCE="$ROOT/assets/RetroBurner.png"
+ICON_STAGED="$ROOT/build/appimage/${APP_ID}.png"
 
 OUTPUT="$DIST/Retro-Burner-${VERSION}-${ARCH}.AppImage"
 ZSYNC="$OUTPUT.zsync"
@@ -57,7 +58,7 @@ if (("${#missing[@]}" != 0)); then
     exit 2
 fi
 
-for required_file in "$DESKTOP" "$METAINFO" "$ICON"; do
+for required_file in "$DESKTOP" "$METAINFO" "$ICON_SOURCE"; do
     [[ -f "$required_file" ]] || {
         echo "[FAIL] Required packaging file is missing: $required_file" >&2
         exit 3
@@ -99,13 +100,15 @@ fi
 echo
 echo "[4/8] Assemble AppDir and deploy runtime libraries"
 rm -rf "$APPDIR"
+mkdir -p "$(dirname "$ICON_STAGED")"
+cp "$ICON_SOURCE" "$ICON_STAGED"
 mkdir -p     "$APPDIR/usr/bin"     "$APPDIR/usr/share/metainfo"
 
 # Passing the embedded helper build outputs to linuxdeploy is intentional:
 # Retro Burner stores these helpers inside the main ELF, but executes extracted
 # copies at runtime. Having linuxdeploy inspect them ensures their shared
 # library dependencies are present in the AppImage too.
-APPIMAGE_EXTRACT_AND_RUN=1 "$LINUXDEPLOY"     --appdir "$APPDIR"     --executable "$APP"     --executable "$RETROBEAM"     --executable "$ABGX360"     --executable "$CDIRIP"     --desktop-file "$DESKTOP"     --icon-file "$ICON"
+APPIMAGE_EXTRACT_AND_RUN=1 "$LINUXDEPLOY"     --appdir "$APPDIR"     --executable "$APP"     --executable "$RETROBEAM"     --executable "$ABGX360"     --executable "$CDIRIP"     --desktop-file "$DESKTOP"     --icon-file "$ICON_STAGED"
 
 # The helper executables themselves are already embedded in RetroBurner.
 # Keep only the dependency libraries linuxdeploy discovered for them.
